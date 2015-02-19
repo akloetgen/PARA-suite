@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # remove all temporary files
-rm examples/mapping/testout*
+rm ../examples/mapping/testout*
+rmdir ../examples/mapping/
 
-rm examples/simulation/testout*
+rm ../examples/simulation/testout*

@@ -30,6 +30,7 @@ my $fasta_file = $ARGV[0];
 my $output_prefix = $ARGV[1];
 my $output_file = $output_prefix . ".fastq";
 my $log_file = $output_prefix . ".log";
+my $error_log = $output_prefix . ".err";
 my $error_profile_file = $ARGV[2];
 my $t2c_profile_file = $ARGV[3];
 my $t2c_position_file = $ARGV[4];
@@ -43,7 +44,7 @@ my $bound_prob = $ARGV[7];
 my @byte_to_qual = ("!", "\"", "\#", "\$", "\%", "\&", "\'", "\(", "\)", "\*", "\+", "\,", "\-", "\.", "\/", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "\:", "\;", "\<", "\=", "\>", "\?", "\@", "A","B", "C","D", "E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","\[","\\","\]","\^","\_","\`","a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","{","|","}","~",")");
 
 # how many reads should be collected from a fasta sequence; position should be selected uniformly distributed given the length of the read sequence
-my $select_read = 1.0;
+my $select_read = 0.5;
 
 # set to 1 to allow for indels given by indels-file
 my $allow_indels = 1;
@@ -155,6 +156,7 @@ my $int = 0;
 open(FASTA, "<$fasta_file");
 open(OUT, ">$output_file");
 open(LOG, ">$log_file");
+open(ERR, ">$error_log");
 while (my $line = <FASTA>) {
 	chomp($line);
 	
@@ -185,6 +187,7 @@ print LOG "\nSome parameters:\nselect_prob=$select_read\nread bound by RBP proba
 close(LOG);
 close(OUT);
 close(FASTA);
+close(ERR);
 
 
 sub createReads {
@@ -303,7 +306,8 @@ sub createReads {
 				my $start = $start_pos[floor(rand() * $num_start_pos)];
 				my $end = $end_pos[floor(rand() * $num_end_pos)];
 				if ($end - $start > $max_length || $start >= $end) {
-					print "start $start, end $end\n";
+					# skip these start and end positions because they are outranging prerequisites, caused by the normal-distribution selection in rare cases.
+					#print "start $start, end $end\n";
 					next;
 				}
 				
@@ -367,8 +371,13 @@ sub createReads {
 					#print "check for test=$test < match=$match_prob; < first_mm_prob=$first_mm_prob and < second_mm_prob=$second_mm_prob\n";
 					
 					unless (defined($ACGT_hash{$current_base})) {
-						print "BASE WHICH IS NOT IN ACGT_hash=$current_base\n";
-						print "FOUND IN SEQUENCE=$sequence\n";
+						print "unhandled error found. Please submit the .err error-log to the developer. Thanks!\n";
+						print ERR "unrecognized base in ACGT_hash=$current_base\n";
+						print ERR "Sequence_header=$header\n";
+						print ERR "Sequence=$sequence\n";
+						
+						# select random base for $current_base as this is not covered by $ACGT_hash
+						$current_base = $ACGT[floor(rand() * 4)];
 					}
 					
 					if ($test < $$errors_ref[$ACGT_hash{$current_base}]) {
