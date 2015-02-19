@@ -1,0 +1,23 @@
+Usage: java -jar profilehmm.jar
+Parameters:
+-a FILE		alignment file in BAM-format OR
+-q FILE		read file in FASTQ-format [one of these must be specified; in case of -q an alignment using Bowtie2 is derived]
+				-a OR -q must be set
+-r FILE		reference genomic sequence file, must be indexed
+				must be set in case of -q option
+-t FILE		reference transcriptomic sequence file
+				optional, but only if -q option is set
+-o STRING	output file prefix, should be set in case of -q option
+-l INT		maximal read length given [can probably be calculated??] [default: 101]
+-p INT		num threads [default: 1]
+--gm INT	mapping quality filter for genomic mapping [default: 10]
+--tm INT	mapping quality filter for transcriptomic mapping [default: 1]
+--profile	calculates error-profile ONLY for genomic mapping, not for transcriptomic mapping!
+--ep		only if --profile is active. Shows error-profile as a plot (NOTE: X11-terminal must be activated)
+--qual		calculates mean and sd for quality values per mapped base
+--refine	uses error-profile derived from selected mapping vs. genome to apply PARMA with the calculated error-profile
+--ref-refine	Reference file for PARMA algorithm, if --refine option was activated [default: same as -r file]
+--mode		defines mapping algorithm used: bt2, bwa, parma, user [default: BT2]
+--parma-mm	ONLY IF "--mode parma": number of average mismatches while applying PARMA algorithm [default: 2]
+--parma-ep	ONLY IF "--mode parma": filename of the error profile file
+-c			ONLY IF "--mode user": please provide an entire mapping command including all relevant options, e.g. max mismatches etc.
