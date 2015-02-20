@@ -20,7 +20,7 @@ java -jar parma.jar benchmark ../examples/mapping/testout_simulation_mapped.comb
 java -jar parma.jar error ../examples/mapping/testout_simulation_mapped.combined.bam ../examples/references/reference_chr1.fa 51 -q
 
 # combine genomic and transcriptomic mapping
-java -jar parma.jar comb ../examples/mapping/testout_simulation_mapped.PARMA-genomic.bam ../examples/mapping/testout_simulation_mapped.PARMA-transcriptomic.bam ../examples/mapping/testout_simulation_mapped.PARMA.combined.bam
+java -jar parma.jar comb ../examples/mapping/testout_simulation_mapped.PARMA-genomic.bam ../examples/mapping/testout_simulation_mapped.PARMA-transcript.bam ../examples/mapping/testout_simulation_mapped.PARMA.combined.bam
 
 # clustering aligned PAR-CLIP reads to obtain RBP-bound regions
 java -jar parma.jar clust ../examples/mapping/testout_simulation_mapped.combined.bam ../examples/references/reference_chr1.fa ../examples/mapping/testout_simulation_mapped.combined.clusters ../examples/references/snp_db.vcf.gz 1
