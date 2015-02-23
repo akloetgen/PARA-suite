@@ -10,7 +10,7 @@ use List::Util qw(min max);
 use Data::Dumper;
 
 my $size_argv = @ARGV;
-if ($size_argv != 8) {
+if ($size_argv != 8 || $ARGV[0] eq "-h" || $ARGV[0] eq "--help") {
 	print "Script started without enough arguments:\n";
 	print "Paramters are required as follows:\n";
 	print "\ttranscripts\t\tfasta file containing transcript sequences on which PAR-CLIP reads are simulated\n";
