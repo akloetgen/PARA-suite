@@ -11,9 +11,9 @@ For more information on the usage please see "Manual.pdf".
 The 3rd installation step sets the path to the binary-folder of the PARMA algorithm to make it accessible for the PARMA toolkit. Therefore, make sure the PARMA algorithm (https://github.com/akloetgen/PARMA) is installed correctly.
 
 ### Requirements
-- Java (6, 7 or 8 should all work)
-- Perl (Version 5 or newer)
-- samtools (Version XY or newer: https://github.com/samtools/samtools) 
+- Java (7 or 8 should work)
+- Perl 5
+- samtools (Version 1.0 or newer: https://github.com/samtools/samtools) 
 - Perl CPAN Math::Random package (http://search.cpan.org/~grommel/Math-Random-0.71/)
 
 ### Getting help
