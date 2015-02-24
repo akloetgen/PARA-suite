@@ -18,3 +18,10 @@ The 3rd installation step sets the path to the binary-folder of the PARMA algori
 
 ### Getting help
 	java -jar parma.jar --help
+
+## Testdata
+	chmod 700 examples.sh
+	chmod 700 examples_remove_temp.sh
+	./examples.sh
+	./examples_remove_temp.sh
+	
