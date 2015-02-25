@@ -26,4 +26,4 @@ The 3rd installation step sets the path to the binary-folder of the PARMA algori
 
 If you have installed the Perl CPAN Math::Random package locally, you have to specify the path to the installed package in the examples.sh script at the top like in the following example:
 	myPathToMathRandom=~/.cpan/installed/lib/perl
-
+	
