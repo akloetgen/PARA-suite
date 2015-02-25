@@ -24,5 +24,5 @@ The 3rd installation step sets the path to the binary-folder of the PARMA algori
 	./examples.sh
 	./examples_remove_temp.sh
 
-If you have installed the Perl CPAN Math::Random package locally, you have to specify the path to to installed package in the examples.sh script at the top.
+If you have installed the Perl CPAN Math::Random package locally, you have to specify the path to the installed package in the examples.sh script at the top.
 
