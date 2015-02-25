@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# if you have installed the CPAN Math::Random library somewhere else, please specify it as a parameter to the script
-myPathToMathRandom=$1
+# if you have installed the CPAN Math::Random library somewhere else, please specify the location here
+myPathToMathRandom=/etc/perl/
 
 # executing the PAR-CLIP read simulator script using the example files in /../examples/simulation/
 java -jar parma.jar simulate ../examples/simulation/reference_chr1_transcripts.fa ../examples/simulation/testout_simulation ../examples/simulation/example.errorprofile ../examples/simulation/example.sitefrequency ../examples/simulation/example.sitepositions ../examples/simulation/example.qualities ../examples/simulation/example.indels 0.6 -I $myPathToMathRandom

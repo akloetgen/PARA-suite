@@ -20,8 +20,9 @@ The 3rd installation step sets the path to the binary-folder of the PARMA algori
 	java -jar parma.jar --help
 
 ## Testdata
-	chmod 700 examples.sh
-	chmod 700 examples_remove_temp.sh
+	chmod u+x examples.sh examples_remove_temp.sh
 	./examples.sh
 	./examples_remove_temp.sh
-	
+
+If you have installed the Perl CPAN Math::Random package locally, you have to specify the path to to installed package in the examples.sh script at the top.
+
