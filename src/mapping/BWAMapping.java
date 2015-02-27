@@ -1,13 +1,14 @@
 package mapping;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 
-import enums.PARMAPropertiesEnum;
-import enums.StreamRedirect;
 import main.MappingLogger;
 import main.PARMAProperties;
+import enums.PARMAPropertiesEnum;
+import enums.StreamRedirect;
 
 /**
  * 
@@ -20,16 +21,37 @@ public class BWAMapping extends Mapping {
 			String outputPrefix, int mappingQualityFilter,
 			String additionalOptions) throws MappingErrorException {
 		try {
-			// String mismatches = "2";
-			setTimeStart();
-			MappingLogger.getLogger().info(
-					"Starting BWA mapping to investigate error-profile");
 			List<String> bwaCommandList = new LinkedList<String>();
 			String bwaLocation = PARMAProperties
 					.getProperty(PARMAPropertiesEnum.BWA_LOCATION);
 			if (bwaLocation == null) {
 				bwaLocation = "";
+			} else if (!bwaLocation.endsWith("/")) {
+				bwaLocation += "/";
 			}
+
+			// check whether BWA index exists for reference file, else calculate
+			// it with the PARMA-extension of BWA
+			File indexFile = new File(reference + ".bwt");
+			if (!indexFile.exists()) {
+				// create index
+				bwaCommandList.add(bwaLocation + "bwa");
+				bwaCommandList.add("index");
+				bwaCommandList.add(reference);
+				MappingLogger.getLogger().info(
+						"Creating BWA-index for reference file using BWA");
+				if (executeCommand(bwaCommandList, StreamRedirect.ERROR) != 0) {
+					MappingErrorException e = new MappingErrorException();
+					e.setMappingCommand(bwaCommandList);
+					throw e;
+				}
+				bwaCommandList.clear();
+			}
+
+			setTimeStart();
+			MappingLogger.getLogger().info(
+					"Starting BWA mapping to investigate error-profile");
+
 			bwaCommandList.add(bwaLocation + "bwa");
 			bwaCommandList.add("aln");
 			bwaCommandList.add("-t");
@@ -46,9 +68,13 @@ public class BWAMapping extends Mapping {
 				e.setMappingCommand(bwaCommandList);
 				throw e;
 			}
-			MappingLogger.getLogger().info("Convert BWA mapping to SAM file");
+
+			MappingLogger
+					.getLogger()
+					.info("Convert SAM-file of Bowtie2 mapped reads to BAM-file, filter, sort, index, remove temp files");
+			MappingLogger.getLogger().debug("Convert BWA mapping to SAM file");
 			bwaCommandList.clear();
-			bwaCommandList.add("bwa");
+			bwaCommandList.add(bwaLocation + "bwa");
 			bwaCommandList.add("samse");
 			bwaCommandList.add(reference);
 			bwaCommandList.add(outputPrefix + ".sai");
@@ -61,11 +87,11 @@ public class BWAMapping extends Mapping {
 				e.setMappingCommand(bwaCommandList);
 				throw e;
 			}
-			MappingLogger.getLogger().info(
+			MappingLogger.getLogger().debug(
 					"Time passed for BWA algorithm: " + calculatePassedTime()
 							+ " seconds elapsed for BWA alignment");
 
-			MappingLogger.getLogger().info(
+			MappingLogger.getLogger().debug(
 					"Convert SAM-file of BWA mapped reads to BAM-file");
 			List<String> cleanUpCommandsList = new LinkedList<String>();
 			cleanUpCommandsList.add("samtools");
@@ -80,7 +106,7 @@ public class BWAMapping extends Mapping {
 
 			// MAYBE CHECK FOR MAPQFILTER EQUALS 0 AND THEN SKIP THE FOLLOWING
 			// STEP!!!
-			MappingLogger.getLogger().info(
+			MappingLogger.getLogger().debug(
 					"Filtering mapped reads with MAPQ lower than "
 							+ mappingQualityFilter);
 			cleanUpCommandsList.clear();
@@ -94,7 +120,7 @@ public class BWAMapping extends Mapping {
 			cleanUpCommandsList.add(outputPrefix + ".unique.bam");
 			executeCommand(cleanUpCommandsList, StreamRedirect.ALL);
 
-			MappingLogger.getLogger().info("Removing temporary files");
+			MappingLogger.getLogger().debug("Removing temporary files");
 			cleanUpCommandsList.clear();
 			cleanUpCommandsList.add("rm");
 			cleanUpCommandsList.add(outputPrefix + ".sai");

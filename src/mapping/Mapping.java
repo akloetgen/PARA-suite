@@ -68,8 +68,8 @@ public abstract class Mapping {
 
 	public void sortByCoordinateAndIndex(String bamFileName) {
 		try {
-			MappingLogger.getLogger()
-					.info("Sorting BAM-file for faster access");
+			MappingLogger.getLogger().debug(
+					"Sorting BAM-file for faster access");
 			List<String> sortCommandsList = new LinkedList<String>();
 			sortCommandsList.add("samtools");
 			sortCommandsList.add("sort");
@@ -83,7 +83,7 @@ public abstract class Mapping {
 			executeCommand(sortCommandsList, StreamRedirect.STDOUT);
 			// command = "rm " + bamFileName + "sort.bam";
 			// executeCommand(command);
-			MappingLogger.getLogger().info(
+			MappingLogger.getLogger().debug(
 					"Indexing BAM-file for faster access");
 			sortCommandsList.clear();
 			sortCommandsList.add("samtools");
@@ -101,8 +101,8 @@ public abstract class Mapping {
 
 	public void sortByNameAndIndex(String bamFileName) {
 		try {
-			MappingLogger.getLogger()
-					.info("Sorting BAM-file for faster access");
+			MappingLogger.getLogger().debug(
+					"Sorting BAM-file for faster access");
 			List<String> sortCommandsList = new LinkedList<String>();
 			sortCommandsList.add("samtools");
 			sortCommandsList.add("sort");
@@ -117,7 +117,7 @@ public abstract class Mapping {
 			executeCommand(sortCommandsList, StreamRedirect.STDOUT);
 			// command = "rm " + bamFileName + "sort.bam";
 			// executeCommand(command);
-			MappingLogger.getLogger().info(
+			MappingLogger.getLogger().debug(
 					"Indexing BAM-file for faster access");
 			sortCommandsList.clear();
 			sortCommandsList.add("samtools");

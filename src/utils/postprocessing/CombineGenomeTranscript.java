@@ -493,12 +493,12 @@ public class CombineGenomeTranscript {
 			// more time -- seems to make an error?!?!?!?
 			// printReadsToBamFile(readIDToRead);
 
-			MappingLogger.getLogger().info(
+			MappingLogger.getLogger().debug(
 					"an overall of " + mappedReads
 							+ " reads have high mapping potential.");
 			MappingLogger
 					.getLogger()
-					.info("an overall of " + splicedReads
+					.debug("an overall of " + splicedReads
 							+ " reads are spanning at least 1 splice junction!");
 			MappingLogger
 					.getLogger()

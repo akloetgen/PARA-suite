@@ -582,32 +582,46 @@ public class ErrorProfiling {
 			int insertionsZero = 0;
 			int deletionsZero = 0;
 
-			// fileWriterProfile.write("@indel rates"
-			// + System.getProperty("line.separator"));
+			// to avoid NaN values if no insertion/deletion was set during
+			// alignment process, just set indel probabilites to 0.
+
 			for (int i = 0; i < maxReadLength; i++) {
-				insertionsPerPos[i] = (double) insertionsPerPos[i]
-						/ totalCountsPerPos[i];
-				if (insertionsPerPos[i] > 0) {
-					insertionsOverall += insertionsPerPos[i];
-				} else {
+				if (totalCountsPerPos[i] == 0.0) {
+					insertionsPerPos[i] = 0.0;
+					deletionsPerPos[i] = 0.0;
 					insertionsZero++;
-				}
-				deletionsPerPos[i] = (double) deletionsPerPos[i]
-						/ totalCountsPerPos[i];
-				if (deletionsPerPos[i] > 0) {
-					deletionsOverall += deletionsPerPos[i];
-				} else {
 					deletionsZero++;
+				} else {
+					insertionsPerPos[i] = (double) insertionsPerPos[i]
+							/ totalCountsPerPos[i];
+					if (insertionsPerPos[i] > 0) {
+						insertionsOverall += insertionsPerPos[i];
+					} else {
+						insertionsZero++;
+					}
+					deletionsPerPos[i] = (double) deletionsPerPos[i]
+							/ totalCountsPerPos[i];
+					if (deletionsPerPos[i] > 0) {
+						deletionsOverall += deletionsPerPos[i];
+					} else {
+						deletionsZero++;
+					}
 				}
 				fileWriterIndels.write(insertionsPerPos[i] + "");
 				fileWriterIndels.write("\t");
 				fileWriterIndels.write(deletionsPerPos[i] + "");
 				fileWriterIndels.write(System.getProperty("line.separator"));
 			}
-			insertionsOverall = (double) insertionsOverall
-					/ (maxReadLength - insertionsZero);
-			deletionsOverall = (double) deletionsOverall
-					/ (maxReadLength - deletionsZero);
+			if (maxReadLength == insertionsZero
+					&& maxReadLength == deletionsZero) {
+				insertionsOverall = 0.0;
+				deletionsOverall = 0.0;
+			} else {
+				insertionsOverall = (double) insertionsOverall
+						/ (maxReadLength - insertionsZero);
+				deletionsOverall = (double) deletionsOverall
+						/ (maxReadLength - deletionsZero);
+			}
 			fileWriterIndelsMean.write(insertionsOverall + "\t"
 					+ deletionsOverall);
 

@@ -1,5 +1,6 @@
 package mapping;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
@@ -19,26 +20,6 @@ public class PARMAMapping extends Mapping {
 	private String errorProfileFilename;
 	private String indelProfileFilename;
 
-	// private Properties properties;
-
-	public PARMAMapping() {
-		// try {
-		// File newPropertiesFile = new File("parma.properties");
-		// if (!newPropertiesFile.exists()) {
-		// newPropertiesFile.createNewFile();
-		// }
-		// properties = new Properties();
-		// BufferedInputStream stream;
-		// stream = new BufferedInputStream(new FileInputStream(
-		// newPropertiesFile));
-		// properties.load(stream);
-		// stream.close();
-		// } catch (IOException e) {
-		// // TODO Auto-generated catch block
-		// e.printStackTrace();
-		// }
-	}
-
 	public void setErrorProfileFilename(String errorProfileFilename) {
 		this.errorProfileFilename = errorProfileFilename;
 	}
@@ -51,18 +32,41 @@ public class PARMAMapping extends Mapping {
 			String outputPrefix, int mappingQualityFilter,
 			String additionalOptions) throws MappingErrorException {
 		try {
+			List<String> bwaCommandsList = new LinkedList<String>();
+			String parmaLocation = PARMAProperties
+					.getProperty(PARMAPropertiesEnum.PARMA_LOCATION);
+			if (parmaLocation == null) {
+				parmaLocation = "";
+			} else if (!parmaLocation.endsWith("/")) {
+				parmaLocation += "/";
+			}
+
+			// check whether BWA index exists for reference file, else calculate
+			// it with the PARMA-extension of BWA
+			File indexFile = new File(reference + ".bwt");
+			if (!indexFile.exists()) {
+				// create index
+				bwaCommandsList.add(parmaLocation + "bwa");
+				bwaCommandsList.add("index");
+				bwaCommandsList.add(reference);
+				MappingLogger
+						.getLogger()
+						.info("Creating BWA-index for reference file using BWA 0.7.8");
+				if (executeCommand(bwaCommandsList, StreamRedirect.ERROR) != 0) {
+					MappingErrorException e = new MappingErrorException();
+					e.setMappingCommand(bwaCommandsList);
+					throw e;
+				}
+				bwaCommandsList.clear();
+			}
+
 			setTimeStart();
 
 			// String ep_filename =
 			// "/home/akloetgen/read_mapper/bwa-0.7.8_ep/test/error_profile_MSI1+MSI2_bowtie2.tsv";
 			MappingLogger.getLogger().info(
 					"Starting PARMA mapping to investigate error-profile");
-			List<String> bwaCommandsList = new LinkedList<String>();
-			String parmaLocation = PARMAProperties
-					.getProperty(PARMAPropertiesEnum.PARMA_LOCATION);
-			if (parmaLocation == null) {
-				parmaLocation = "";
-			}
+
 			bwaCommandsList.add(parmaLocation + "bwa");
 			bwaCommandsList.add("parma");
 			bwaCommandsList.add("-t");
@@ -83,9 +87,14 @@ public class PARMAMapping extends Mapping {
 				e.setMappingCommand(bwaCommandsList);
 				throw e;
 			}
-			MappingLogger.getLogger().info("Convert PARMA mapping to SAM file");
+
+			MappingLogger
+					.getLogger()
+					.info("Convert SAM-file of PARMA mapped reads to BAM-file, filter, sort, index, remove temp files");
+			MappingLogger.getLogger()
+					.debug("Convert PARMA mapping to SAM file");
 			bwaCommandsList.clear();
-			bwaCommandsList.add("/home/akloetgen/read_mapper/bwa-0.7.8_ep/bwa");
+			bwaCommandsList.add(parmaLocation + "bwa");
 			bwaCommandsList.add("samse");
 			bwaCommandsList.add(reference);
 			bwaCommandsList.add(outputPrefix + ".sai");
@@ -99,11 +108,11 @@ public class PARMAMapping extends Mapping {
 				throw e;
 			}
 
-			MappingLogger.getLogger().info(
+			MappingLogger.getLogger().debug(
 					"Time passed for PARMA algorithm: " + calculatePassedTime()
 							+ " seconds elapsed for PARMA alignment");
 
-			MappingLogger.getLogger().info(
+			MappingLogger.getLogger().debug(
 					"Convert SAM-file of PARMA mapped reads to BAM-file");
 			List<String> cleanUpCommandsList = new LinkedList<String>();
 			cleanUpCommandsList.add("samtools");
@@ -115,7 +124,7 @@ public class PARMAMapping extends Mapping {
 			cleanUpCommandsList.add("-o");
 			cleanUpCommandsList.add(outputPrefix + ".bam");
 			executeCommand(cleanUpCommandsList, StreamRedirect.ALL);
-			MappingLogger.getLogger().info(
+			MappingLogger.getLogger().debug(
 					"Filtering mapped reads with MAPQ lower than "
 							+ mappingQualityFilter);
 			cleanUpCommandsList.clear();
@@ -129,7 +138,7 @@ public class PARMAMapping extends Mapping {
 			cleanUpCommandsList.add(outputPrefix + ".unique.bam");
 			executeCommand(cleanUpCommandsList, StreamRedirect.ALL);
 
-			MappingLogger.getLogger().info("Removing temporary files");
+			MappingLogger.getLogger().debug("Removing temporary files");
 			cleanUpCommandsList.clear();
 			cleanUpCommandsList.add("rm");
 			cleanUpCommandsList.add(outputPrefix + ".sai");

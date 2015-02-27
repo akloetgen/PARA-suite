@@ -18,6 +18,7 @@ public class UserMapping extends Mapping {
 
 	public UserMapping(String userAlignerCommand) {
 		this.userAlignerEntireCommand = userAlignerCommand;
+
 	}
 
 	public void executeMapping(int threads, String reference, String input,
@@ -26,22 +27,37 @@ public class UserMapping extends Mapping {
 		try {
 			MappingLogger.getLogger().info(
 					"Starting user mapping to investigate error-profile");
+			userAlignerEntireCommand = userAlignerEntireCommand.replace(
+					"REFERENCE", reference);
+			userAlignerEntireCommand = userAlignerEntireCommand.replace(
+					"INPUT", input);
+			userAlignerEntireCommand = userAlignerEntireCommand.replace(
+					"OUTPUT", outputPrefix + ".sam");
+			userAlignerEntireCommand = userAlignerEntireCommand.replace(
+					"THREADS", "" + threads);
+
+			MappingLogger.getLogger().debug(
+					"USER COMMAND:" + userAlignerEntireCommand);
 
 			String[] userAlignerCommands = userAlignerEntireCommand
 					.split("\\s");
+
 			List<String> userAlignerCommandsList = new LinkedList<String>();
 			for (int i = 0; i < userAlignerCommands.length; i++) {
 				userAlignerCommandsList.add(userAlignerCommands[i]);
 			}
 
 			// MappingLogger.getLogger().debug(bowtie2Command);
-			if (executeCommand(userAlignerCommandsList, StreamRedirect.NOTHING) != 0) {
+			if (executeCommand(userAlignerCommandsList, StreamRedirect.ALL) != 0) {
 				MappingErrorException e = new MappingErrorException();
 				e.setMappingCommand(userAlignerCommandsList);
 				throw e;
 			}
 
-			MappingLogger.getLogger().info(
+			MappingLogger
+					.getLogger()
+					.info("Convert SAM-file of user mapped reads to BAM-file, filter, sort, index, remove temp files");
+			MappingLogger.getLogger().debug(
 					"Convert SAM-file of usermapping mapped reads to BAM-file");
 			List<String> cleanUpCommandsList = new LinkedList<String>();
 			cleanUpCommandsList.add("samtools");
@@ -54,7 +70,7 @@ public class UserMapping extends Mapping {
 			cleanUpCommandsList.add(outputPrefix + ".bam");
 			executeCommand(cleanUpCommandsList, StreamRedirect.ALL);
 
-			MappingLogger.getLogger().info(
+			MappingLogger.getLogger().debug(
 					"Filtering mapped reads with MAPQ lower than "
 							+ mappingQualityFilter);
 			cleanUpCommandsList.clear();
@@ -68,7 +84,7 @@ public class UserMapping extends Mapping {
 			cleanUpCommandsList.add(outputPrefix + ".unique.bam");
 			executeCommand(cleanUpCommandsList, StreamRedirect.ALL);
 
-			MappingLogger.getLogger().info("Removing temporary files");
+			MappingLogger.getLogger().debug("Removing temporary files");
 			cleanUpCommandsList.clear();
 			cleanUpCommandsList.add("rm");
 			cleanUpCommandsList.add(outputPrefix + ".sam");

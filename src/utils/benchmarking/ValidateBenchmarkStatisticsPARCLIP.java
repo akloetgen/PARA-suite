@@ -47,7 +47,7 @@ public class ValidateBenchmarkStatisticsPARCLIP {
 	// System.exit(0);
 	// }
 	public void calculateBenchmarkStatistics(String mappingFileName,
-			String outStatistics, String readsFile) {
+			String outStatistics, String readsFile, boolean onlyBoundClusters) {
 
 		// File mappingFile = new File(mappingFileName);
 		// SAMFileReader samFileReader = new SAMFileReader(mappingFile);
@@ -114,11 +114,12 @@ public class ValidateBenchmarkStatisticsPARCLIP {
 
 				// following splitting is for ART simulated data
 
-				clusterBound = splittedReadName[4].split("-")[0];
-				if (clusterBound.equals("1")) {
-					mapped_overall_bound++;
+				if (onlyBoundClusters) {
+					clusterBound = splittedReadName[4].split("-")[0];
+					if (clusterBound.equals("1")) {
+						mapped_overall_bound++;
+					}
 				}
-
 				// FILTER FOR RBP-BOUND CLUSTERS! ONLY THOSE ARE OF INTEREST AND
 				// ARE DENOTED BY A 1 IN THE NEXT TO LAST SPLIT
 				// if (!clusterBound.equals("1")) {
@@ -138,7 +139,7 @@ public class ValidateBenchmarkStatisticsPARCLIP {
 				if (readChr.equals(chr)
 						&& (readStart - 5) <= readHit.getAlignmentStart()
 						&& (readEnd + 5) >= readHit.getAlignmentEnd()
-						&& clusterBound.equals("1")) {
+						&& (!onlyBoundClusters || clusterBound.equals("1"))) {
 
 					// CEHCK THIS AGAIN ON MAPSPLICE; WHETHER READ AND NOT
 					// READHIT SHOULD BE CHECKED AGAIN!=?!==!=!=!?!?!??!?!F
@@ -261,8 +262,15 @@ public class ValidateBenchmarkStatisticsPARCLIP {
 
 			// float precision = (float) matched_correctly / mapped_overall;
 			// float sensitivity = (float) matched_correctly / allreads;
-			float precision = (float) matched_correctly / mapped_overall_bound;
-			float sensitivity = (float) matched_correctly / allreads_bound;
+			float precision;
+			float sensitivity;
+			if (onlyBoundClusters) {
+				precision = (float) matched_correctly / mapped_overall_bound;
+				sensitivity = (float) matched_correctly / allreads_bound;
+			} else {
+				precision = (float) matched_correctly / mapped_overall;
+				sensitivity = (float) matched_correctly / allreads;
+			}
 			float mapped_perc = (float) mapped_overall / allreads;
 			float f1_score = (float) 2 * (precision * sensitivity)
 					/ (precision + sensitivity);
@@ -273,6 +281,9 @@ public class ValidateBenchmarkStatisticsPARCLIP {
 					+ allreads + "\nmapped overall percentage:\t" + mapped_perc
 					+ "\nprecision:\t" + precision + "\nsensitivity:\t"
 					+ sensitivity + "\nf1 score:\t" + f1_score);
+			MappingLogger.getLogger().info(
+					"Precision:\t\t\t" + precision + "\nSensitivity:\t\t\t"
+							+ sensitivity + "\nF1 score:\t\t\t" + f1_score);
 			MappingLogger.getLogger().debug(
 					"matched correctly:\t\t" + matched_correctly
 							+ "\nmapped overall:\t\t\t" + mapped_overall

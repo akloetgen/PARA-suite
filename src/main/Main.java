@@ -2,8 +2,6 @@ package main;
 
 import java.io.IOException;
 import java.lang.ProcessBuilder.Redirect;
-import java.net.URL;
-import java.net.URLConnection;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -36,10 +34,7 @@ public class Main {
 	private static final String AUTHOR = "Andreas Kloetgen";
 
 	public static void main(String[] args) {
-		MappingLogger.getLogger().info("Program:\t\tPARMA toolkit");
-		MappingLogger.getLogger().info("Version:\t\t" + VERSION);
-		MappingLogger.getLogger().info(
-				"Author:\t\t" + AUTHOR + System.getProperty("line.separator"));
+
 		// MappingLogger.getLogger().info(
 		// "Further reading:\t" + "URL" + System.getProperty("line.separator"));
 
@@ -48,6 +43,7 @@ public class Main {
 
 		if (args.length == 0 || args[0].equals("-h")
 				|| args[0].equals("--help")) {
+			help.printProgramInfo(ProgramMode.TOOLKIT, VERSION, AUTHOR);
 			help.printProgramModeHelp();
 			System.exit(0);
 		}
@@ -82,8 +78,8 @@ public class Main {
 							+ "\" not found. Please consider the following help-message for a correct usage.");
 			help.printProgramModeHelp();
 			System.exit(0);
-			break;
 		}
+		help.printProgramInfo(mode, VERSION, AUTHOR);
 
 		if (mode.equals(ProgramMode.MAPPING)) {
 			// ############## MAPPING TOOL ##############
@@ -264,7 +260,7 @@ public class Main {
 						if (!isRefine && isTranscriptMapping) {
 							MappingLogger
 									.getLogger()
-									.info("Extract unaligned/weakly aligned reads (with MAPQ < "
+									.debug("Extract unaligned/weakly aligned reads (with MAPQ < "
 											+ mappingQualityFilterGenomic
 											+ ") from "
 											+ "BAM file and create new FASTQ file");
@@ -335,7 +331,7 @@ public class Main {
 						if (isTranscriptMapping) {
 							MappingLogger
 									.getLogger()
-									.info("Extract unaligned/weakly aligned reads (with MAPQ < "
+									.debug("Extract unaligned/weakly aligned reads (with MAPQ < "
 											+ mappingQualityFilterGenomic
 											+ ") from "
 											+ "BAM file and create new FASTQ file");
@@ -376,7 +372,7 @@ public class Main {
 						combiner.combine(genomicMappingFileName,
 								transcriptMappingFileName, mappingFileName);
 						mapping.sortByCoordinateAndIndex(mappingFileName);
-						MappingLogger.getLogger().info("Combine finished.");
+						MappingLogger.getLogger().debug("Combine finished.");
 					} else {
 						mappingFileName = genomicMappingFileName;
 					}
@@ -436,6 +432,7 @@ public class Main {
 			String mappingFileName = null;
 			String outStatistics = null;
 			String readsFile = null;
+			boolean onlyBoundClusters = false;
 
 			if (args.length == 1) {
 				help.printBenchmarkToolHelp();
@@ -445,6 +442,9 @@ public class Main {
 				mappingFileName = args[1];
 				outStatistics = args[2];
 				readsFile = args[3];
+				if (args.length >= 5 && args[4].equals("--only-bound")) {
+					onlyBoundClusters = true;
+				}
 			} catch (ArrayIndexOutOfBoundsException e) {
 				MappingLogger
 						.getLogger()
@@ -455,7 +455,7 @@ public class Main {
 			MappingLogger.getLogger().debug("Start benchmarking mapping file");
 			ValidateBenchmarkStatisticsPARCLIP validate = new ValidateBenchmarkStatisticsPARCLIP();
 			validate.calculateBenchmarkStatistics(mappingFileName,
-					outStatistics, readsFile);
+					outStatistics, readsFile, onlyBoundClusters);
 			MappingLogger.getLogger().debug("Finished.");
 			System.exit(0);
 		} else if (mode.equals(ProgramMode.ERRORPROFILE)) {
@@ -478,11 +478,9 @@ public class Main {
 				for (int i = 4; i < args.length; i++) {
 					switch (args[i]) {
 					case "-q":
-						i++;
 						isQualityCalc = Boolean.parseBoolean(args[i]);
 						break;
 					case "-p":
-						i++;
 						showErrorPlot = Boolean.parseBoolean(args[i]);
 						break;
 					default:
