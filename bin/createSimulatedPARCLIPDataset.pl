@@ -8,6 +8,10 @@ use POSIX qw(ceil);
 use POSIX qw(floor);
 use List::Util qw(min max);
 use Data::Dumper;
+use DB_File;
+use Fcntl;
+
+# print "FSMKOPFEMSOPFKESOPFSEOP\n";
 
 my $size_argv = @ARGV;
 if ($size_argv != 8 || $ARGV[0] eq "-h" || $ARGV[0] eq "--help") {
@@ -31,6 +35,8 @@ my $output_prefix = $ARGV[1];
 my $output_file = $output_prefix . ".fastq";
 my $log_file = $output_prefix . ".log";
 my $error_log = $output_prefix . ".err";
+my $clusters_file = $output_prefix . ".clusters";
+my $snp_file = $output_prefix . "_snps.vsf";
 my $error_profile_file = $ARGV[2];
 my $t2c_profile_file = $ARGV[3];
 my $t2c_position_file = $ARGV[4];
@@ -38,13 +44,14 @@ my $quality_file = $ARGV[5];
 my $indel_file = $ARGV[6];
 # for bound_prob, standard values are 1.0 for 100%T-C, 0.5 for 50% T-C simulating real par-clip reads and 0.0 for 0% T-C as control for PAR-CLIP read structure.
 my $bound_prob = $ARGV[7];
+# my $db_snp = $ARGV[8];
 
 
 ## from 0 quality to 64?: !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~
 my @byte_to_qual = ("!", "\"", "\#", "\$", "\%", "\&", "\'", "\(", "\)", "\*", "\+", "\,", "\-", "\.", "\/", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "\:", "\;", "\<", "\=", "\>", "\?", "\@", "A","B", "C","D", "E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","\[","\\","\]","\^","\_","\`","a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","{","|","}","~",")");
 
 # how many reads should be collected from a fasta sequence; position should be selected uniformly distributed given the length of the read sequence
-my $select_read = 0.5;
+my $select_read = 0.216;
 
 # set to 1 to allow for indels given by indels-file
 my $allow_indels = 1;
@@ -54,9 +61,12 @@ my $allow_indels = 1;
 my $max_number_T2C_positions = 4;
 my $max_start_pos_per_cluster = 3;
 my $max_end_pos_per_cluster = 3;
+my $report_snp = 0.8;
 
 # probability for exchanging a single base as sequencing error; should depend on read length
 #my $prob_error = 0.0;
+
+print "Loading input files\n";
 
 # read in error-profile from file:
 # format: 2-dim array, jeweils ACGT und darin dann die conversion-probabilities
@@ -118,6 +128,31 @@ while (my $line = <POS>) {
 }
 close(POS);
 
+# my %db_snp;
+# my @db_lines;
+# my $tie = tie(@db_lines, "DB_File", $db_snp, O_RDWR, 0666, $DB_RECNO) or die "Cannot open file $db_snp: $!\n";
+
+# print "line 100=" . $db_lines[10000] . "\n";
+# my ($key, $val);
+
+# print $db_lines[1000000] . "\n";
+
+
+# foreach my $key (@db_lines) {
+	# print "key=$key\n";
+# }
+
+# open(SNP, "<$db_snp");
+# while (my $line = <SNP>) {
+	# chomp($line);
+	# next if ($line =~ /^\#/);
+	
+	# my @splitted_line = split(/\t/, $line);
+	# 0=chr, 1=pos, 2=ID, 3=Ref, 4=alt
+	# $db_snp{"chr" . $splitted_line[0] . "-" . $splitted_line[1]} = \@splitted_line;
+# }
+# close(SNP);
+
 # read length, take normal distributed between these lengths;
 my $min_length = 7;
 my $max_length = 30;
@@ -126,7 +161,7 @@ my $max_length = 30;
 # ultra is 0.6; high rate was 0.45, mid-high is 0.35, mid was 0.25, low-mid is 0.15 and low is 0.05, zero is 0.0
 #my $bound_prob = 0.0;
 
-my ($header, $sequence, $T2C_errors, $mut, $most_T2C, $most_error, $reads, $av_reads_per_cluster, $clusters, $sum_read_length, $av_read_lenght, $num_indels, $simulated_bases);
+my ($header, $sequence, $T2C_errors, $mut, $most_T2C, $most_error, $reads, $av_reads_per_cluster, $clusters, $sum_read_length, $av_read_lenght, $num_indels, $simulated_bases, $snps, $clusters_passed, $snp_id);
 
 # variables that are used to calculate a statistic on created dataset;
 $sum_read_length = 0;
@@ -136,9 +171,14 @@ $most_T2C = 0;
 $most_error = 0;
 $T2C_errors = 0;
 $mut = 0;
+$snps = 0;
 $reads = 0;
 $num_indels = 0;
 $simulated_bases = 0;
+$clusters_passed = 0;
+$snp_id = 1;
+
+print "Files loaded. Starting simulating reads\n";
 
 # lookups for mutations and quality scores
 my @ACG = ("A", "C", "G");
@@ -157,9 +197,11 @@ open(FASTA, "<$fasta_file");
 open(OUT, ">$output_file");
 open(LOG, ">$log_file");
 open(ERR, ">$error_log");
+open(CLUSTERS, ">$clusters_file");
+open(SNP, ">$snp_file");
+print SNP "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
 while (my $line = <FASTA>) {
 	chomp($line);
-	
 	if ($line =~ m/^>/) {
 		$int++;
 		if ($int % 10000 == 0) {
@@ -180,7 +222,7 @@ $av_reads_per_cluster = $reads / $clusters;
 $av_read_lenght = $sum_read_length / $reads;
 
 # maybe add average number of reads per cluster, "mutated"/"bound" clusters etc
-print LOG "number reads generated: $reads\nnumber bases simulated: $simulated_bases\naverage read-length: $av_read_lenght\nnumber clusters generated: $clusters\naverage reads per cluster: $av_reads_per_cluster\nT2C mutations occured: $T2C_errors\nsequencing errors occured: $mut\nread with most T2C: $most_T2C\nread with most errors: $most_error\nnumber indels generated: $num_indels\n";
+print LOG "number reads generated: $reads\nnumber bases simulated: $simulated_bases\naverage read-length: $av_read_lenght\nnumber clusters generated: $clusters\naverage reads per cluster: $av_reads_per_cluster\nT2C mutations occured: $T2C_errors\nsequencing errors occured: $mut\nread with most T2C: $most_T2C\nread with most errors: $most_error\nnumber indels generated: $num_indels\nnumer snps generated: $snps\n";
 
 print LOG "\nSome parameters:\nselect_prob=$select_read\nread bound by RBP probability: $bound_prob\n";
 
@@ -188,6 +230,8 @@ close(LOG);
 close(OUT);
 close(FASTA);
 close(ERR);
+close(CLUSTERS);
+close(SNP);
 
 
 sub createReads {
@@ -195,21 +239,42 @@ sub createReads {
 	my $header = shift;
 	my $sequence = shift;
 	
-	#my @header_split = split("\\|", $header);
-	#my $header_start = $header_split[2];
-	#my $header_end = $header_split[3];
+	my @header_split = split("\\|", $header);
+	my $current_chr = $header_split[2];
+	my $header_starts = $header_split[3];
+	my $header_ends = $header_split[4];
+	my $header_strand = $header_split[-1];
+	# print "starts=$header_starts and ends=$header_ends and strand=$header_strand\n";
+	
+	my @header_starts_split = split(/\;/, $header_starts);
+	@header_starts_split = sort {$a <=> $b} @header_starts_split;
+	my @header_ends_split = split(/\;/, $header_ends);
+	@header_ends_split = sort {$a <=> $b} @header_ends_split;
+	my $num_exons = @header_starts_split;
+	my @genomic_positions;
+	
+	for (my $i = 0; $i < $num_exons; $i++) {
+		# print "push " . $header_starts_split[$i] . " to " . $header_ends_split[$i] . "\n";
+		push(@genomic_positions, $header_starts_split[$i]..$header_ends_split[$i]);
+	}
+	if ($header_strand == -1) {
+		@genomic_positions = reverse(@genomic_positions);
+	}
+	# exit;
 
 	if (rand() < $select_read) {
 		# select reads from transcript sequence only on some of the inputted transcript sequences
 
 		# decide how many clusters and how many reads per cluster should exist
 		my $num_clusters = ceil(rand() * 3);
-		my @num_reads_per_cluster = map int, random_normal($num_clusters, 12, 10);
+		my @num_reads_per_cluster = map int, random_normal($num_clusters, 16, 10);
 		$clusters += $num_clusters;
+		
 			
 		# for each cluster, create as many reads as it is supposed by random number. read position within cluster varies, decision on whether cluster "is bound by RBP".
 		my $cluster_index = 1;
 		foreach (@num_reads_per_cluster) {
+			$clusters_passed++;
 			my $number_reads_generate = ceil($_);
 			#$reads += $number_reads_generate;
 			my $cluster_pos = ceil(rand() * (length($sequence) - ($max_length)));
@@ -225,6 +290,17 @@ sub createReads {
 			## IMPLEMENT CHECK SO THAT END POS CANNOT BE GREATER THAN CDS SEQUENCE!!! AND CHECK CLUSTER_POS INIT SOME LINES ABOVE, WHETHER *2 IS OK?!?!??!?!?!?
 			my @start_pos = map int, random_normal($num_start_pos, $cluster_pos, 1);
 			my @end_pos = map int, random_normal($num_end_pos, $cluster_pos + ($max_length - $min_length), 1);
+			
+			# create CLUSTER output to validate proper cluster identification in the end with true/false positives and true/false negatives!!!!!!!!
+			my $cluster_start = $genomic_positions[min(@start_pos)];
+			my $cluster_end = $genomic_positions[max(@end_pos)];
+			if ($header_strand == -1) {
+				my $cluster_start_temp = $cluster_start;
+				$cluster_start = $cluster_end;
+				$cluster_end = $cluster_start_temp;
+			}
+			
+			
 			#while (max(@start_pos) >= min(@end_pos)) {
 			#	@start_pos = map int, random_normal($num_start_pos, $cluster_pos, 1);
 			#	@end_pos = map int, random_normal($num_end_pos, $cluster_pos + ($max_length - $min_length), 1);
@@ -287,6 +363,36 @@ sub createReads {
 				#print $numMissed . "\n";
 			}
 			
+			print CLUSTERS "cl_$clusters_passed\tchr$current_chr\t$cluster_start\t$cluster_end\t$cluster_bound\n";
+			
+			#pre-select possible SNPs positions on the entire transcript
+			my %snps_on_transcript;
+			for (my $z = 0; $z < length($sequence); $z++) {
+				# if (defined($db_snp{$current_chr . "-" . $genomic_positions[$z]})) {
+					my $test_snp = rand();
+					# MAF considered to be 1% for ALL annotated SNPs!!!!! results in approx. 1 SNP per every 3 clusters in total.
+					my $alt_base = &mutate_base(substr($sequence, $z, 1));
+					# my $allele_freq;
+					my @snp_array;
+					if ($test_snp <= 0.01) {
+						# define SNP as homozygous with 50% probability, else it will be heterozygous
+						if (rand() <= 0.5) {
+							push(@snp_array, 1);
+						} else {
+							push(@snp_array, 0.5);
+						}
+						push(@snp_array, $alt_base);
+						$snps_on_transcript{$z} = \@snp_array;
+						# report SNP to SNV file if it passes the filter
+						my $report_snp_prob = rand();
+						if ($report_snp_prob <= $report_snp) {
+							print SNP "$current_chr\t$genomic_positions[$z]\tsnp$snp_id\t" . substr($sequence, $z, 1) . "\t$alt_base\t.\t.\t.\n";
+						}
+						$snp_id++;
+					}
+				# }
+			}
+			
 			# for each read, create sequence with errors, T2C and base calling quality.
 			for (my $i = 0; $i < $number_reads_generate; $i++) {
 				#my $offset = ($max_length - ceil((rand() * ($max_length - $min_length)))) / 3;
@@ -316,6 +422,7 @@ sub createReads {
 				my $read_seq_mut = "";
 				my $num_T2C = 0;
 				my $num_error = 0;
+				# my $num_snps = 0;
 				my $indel_set = 0;
 				$sum_read_length += length($read_seq_wt);
 				for (my $j = 0; $j < length($read_seq_wt); $j++) {
@@ -327,7 +434,17 @@ sub createReads {
 					#
 					#
 					#
-					
+					# my $current_chr = ;
+					my $current_base_position;
+					# if ($header_strand == 1) {
+					$current_base_position = $genomic_positions[$start + $j];
+					# } elsif ($header_strand == -1) {
+						# $current_base_position = $genomic_positions[-($start + $j+1)];
+					# } else {
+						# print "no proper strand was specified for a certain transcript=" . $header_split[0] . " and " . $header_split[1] . "\n";
+						# print ERR "no proper strand was specified for a certain transcript=" . $header_split[0] . " and " . $header_split[1] . "\n";
+						# exit;
+					# }
 					my $current_base = substr($read_seq_wt, $j, 1);
 					# if current base is a t2c allele, check T2C mutation and CONTINUE! DO NOT LET IT CHANGE BY AN ERROR AGAIN!!!!
 					
@@ -380,6 +497,20 @@ sub createReads {
 						$current_base = $ACGT[floor(rand() * 4)];
 					}
 					
+					if (defined($snps_on_transcript{$start + $j})) {
+						# $test = rand();
+						# my $db_snp_ref = $db_snp{$current_chr . "-" . $current_base_position};
+						
+						my $prob_snp = rand();
+						if ($prob_snp <= $snps_on_transcript{$start + $j}[0]) {
+							# introduce SNP at this certain position
+							$read_qual .= &get_quality($qual{$j}, $sd{$j});
+							$read_seq_mut .= $snps_on_transcript{$start + $j}[1];
+							$snps++;
+							# next;
+						}
+					}
+					
 					if ($test < $$errors_ref[$ACGT_hash{$current_base}]) {
 						#match
 						#$read_qual .= $high_qual[floor(rand()*9)];
@@ -416,6 +547,7 @@ sub createReads {
 						$num_error++;
 						next;
 					}
+					
 					
 					if ($allow_indels) {
 						my $test_indel = rand();
@@ -467,7 +599,16 @@ sub createReads {
 				
 				# print out a 4-row FASTQ read
 				#my $new_header = $header_split[0] . "\|" . $header_split[1] . "\|" . ($header_start + $start) . "\|" . ($header_end + $end);
-				print OUT "\@SEQ_ID:$header\|$cluster_bound-$cluster_index:$i\n$read_seq_mut\n+\n$read_qual\n";
+				# print OUT "\@SEQ_ID:$header\|$cluster_bound-$cluster_index:$i\n$read_seq_mut\n+\n$read_qual\n";
+				my ($read_start, $read_end);
+				if ($header_strand == 1) {
+					$read_start = $genomic_positions[$start];
+					$read_end = $genomic_positions[$end];
+				} else {
+					$read_start = $genomic_positions[$end] + 1;
+					$read_end = $genomic_positions[$start] + 1;				
+				}
+				print OUT "\@SEQ_ID:".$header_split[0]."\|".$header_split[1]."\|".$current_chr."\|".$read_start."\|".$read_end."\|$cluster_bound-$cluster_index:$i\n$read_seq_mut\n+\n$read_qual\n";
 				$reads++;
 			}
 			$cluster_index++;
@@ -546,7 +687,14 @@ sub get_t2c_position {
 
 # REPORT ALL CASES WHERE ERROR, T2C, CHIMERIC ARE INTRODUCED!!!!!! just count numbers as output...
 
-
+# sub searchSNP {
+	# my $current_genomic_position = shift;
+	# line_number of the db_snp index
+	# my $line_number = -1;
+	
+	
+	# return $line_number;
+# }
 
 
 

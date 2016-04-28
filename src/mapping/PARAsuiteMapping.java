@@ -11,87 +11,107 @@ import enums.PARAsuitePropertiesEnum;
 import enums.StreamRedirect;
 
 /**
- * Read alignment using BWA.
  * 
  * @author akloetgen
  * 
  */
-public class BWAMapping extends Mapping {
+public class PARAsuiteMapping extends Mapping {
+
+	private String errorProfileFilename;
+	private String indelProfileFilename;
+
+	public void setErrorProfileFilename(String errorProfileFilename) {
+		this.errorProfileFilename = errorProfileFilename;
+	}
+
+	public void setIndelProfileFilename(String indelProfileFilename) {
+		this.indelProfileFilename = indelProfileFilename;
+	}
 
 	public void executeMapping(int threads, String reference, String input,
 			String outputPrefix, int mappingQualityFilter,
 			String additionalOptions) throws MappingErrorException {
 		try {
-			List<String> bwaCommandList = new LinkedList<String>();
-			String bwaLocation = PARAsuiteProperties
-					.getProperty(PARAsuitePropertiesEnum.BWA_LOCATION);
-			if (bwaLocation == null) {
-				bwaLocation = "";
-			} else if (!bwaLocation.endsWith("/")) {
-				bwaLocation += "/";
+			List<String> bwaCommandsList = new LinkedList<String>();
+			String parasuiteLocation = PARAsuiteProperties
+					.getProperty(PARAsuitePropertiesEnum.PARAsuite_LOCATION);
+			if (parasuiteLocation == null) {
+				parasuiteLocation = "";
+			} else if (!parasuiteLocation.endsWith("/")) {
+				parasuiteLocation += "/";
 			}
 
 			// check whether BWA index exists for reference file, else calculate
-			// it with the PARMA-extension of BWA
+			// it with the PARA-suite-extension of BWA
 			File indexFile = new File(reference + ".bwt");
 			if (!indexFile.exists()) {
 				// create index
-				bwaCommandList.add(bwaLocation + "bwa");
-				bwaCommandList.add("index");
-				bwaCommandList.add(reference);
-				MappingLogger.getLogger().info(
-						"Creating BWA-index for reference file using BWA");
-				if (executeCommand(bwaCommandList, StreamRedirect.ERROR) != 0) {
+				bwaCommandsList.add(parasuiteLocation + "bwa");
+				bwaCommandsList.add("index");
+				bwaCommandsList.add(reference);
+				MappingLogger
+						.getLogger()
+						.info("Creating BWA-index for reference file using BWA 0.7.8");
+				if (executeCommand(bwaCommandsList, StreamRedirect.ERROR) != 0) {
 					MappingErrorException e = new MappingErrorException();
-					e.setMappingCommand(bwaCommandList);
+					e.setMappingCommand(bwaCommandsList);
 					throw e;
 				}
-				bwaCommandList.clear();
+				bwaCommandsList.clear();
 			}
 
 			setTimeStart();
-			MappingLogger.getLogger().info(
-					"Starting BWA mapping to investigate error-profile");
 
-			bwaCommandList.add(bwaLocation + "bwa");
-			bwaCommandList.add("aln");
-			bwaCommandList.add("-t");
-			bwaCommandList.add(threads + "");
-			bwaCommandList.add("-n");
-			bwaCommandList.add(additionalOptions);
-			bwaCommandList.add(reference);
-			bwaCommandList.add(input);
-			bwaCommandList.add("-f");
-			bwaCommandList.add(outputPrefix + ".sai");
-			if (executeCommand(bwaCommandList, StreamRedirect.ERROR) != 0) {
+			MappingLogger.getLogger().info(
+					"Starting PARA-suite mapping to investigate error-profile");
+
+			//TODO rename the BWA extension!!!
+			bwaCommandsList.add(parasuiteLocation + "bwa");
+			bwaCommandsList.add("parasuite");
+			bwaCommandsList.add("-t");
+			bwaCommandsList.add(threads + "");
+			bwaCommandsList.add("-X");
+			bwaCommandsList.add(additionalOptions);
+			bwaCommandsList.add("-p");
+			bwaCommandsList.add(errorProfileFilename);
+			bwaCommandsList.add("-g");
+			bwaCommandsList.add(indelProfileFilename);
+			bwaCommandsList.add(reference);
+			bwaCommandsList.add(input);
+			bwaCommandsList.add("-f");
+			bwaCommandsList.add(outputPrefix + ".sai");
+			if (executeCommand(bwaCommandsList, StreamRedirect.ERROR) != 0) {
 				MappingErrorException e = new MappingErrorException();
-				e.setMappingCommand(bwaCommandList);
+				e.setMappingCommand(bwaCommandsList);
 				throw e;
 			}
 
 			MappingLogger
 					.getLogger()
-					.info("Convert SAM-file of Bowtie2 mapped reads to BAM-file, filter, sort, index, remove temp files");
-			MappingLogger.getLogger().debug("Convert BWA mapping to SAM file");
-			bwaCommandList.clear();
-			bwaCommandList.add(bwaLocation + "bwa");
-			bwaCommandList.add("samse");
-			bwaCommandList.add(reference);
-			bwaCommandList.add(outputPrefix + ".sai");
-			bwaCommandList.add(input);
-			bwaCommandList.add("-f");
-			bwaCommandList.add(outputPrefix + ".sam");
-			if (executeCommand(bwaCommandList, StreamRedirect.ERROR) != 0) {
+					.info("Convert SAM-file of PARA-suite mapped reads to BAM-file, filter, sort, index, remove temp files");
+			MappingLogger.getLogger()
+					.debug("Convert PARA-suite mapping to SAM file");
+			bwaCommandsList.clear();
+			bwaCommandsList.add(parasuiteLocation + "bwa");
+			bwaCommandsList.add("samse");
+			bwaCommandsList.add(reference);
+			bwaCommandsList.add(outputPrefix + ".sai");
+			bwaCommandsList.add(input);
+			bwaCommandsList.add("-f");
+			bwaCommandsList.add(outputPrefix + ".sam");
+			if (executeCommand(bwaCommandsList, StreamRedirect.ERROR) != 0) {
 				MappingErrorException e = new MappingErrorException();
-				e.setMappingCommand(bwaCommandList);
+				e.setMappingCommand(bwaCommandsList);
 				throw e;
 			}
-			MappingLogger.getLogger().debug(
-					"Time passed for BWA algorithm: " + calculatePassedTime()
-							+ " seconds elapsed for BWA alignment");
 
 			MappingLogger.getLogger().debug(
-					"Convert SAM-file of BWA mapped reads to BAM-file");
+					"Time passed for PARA-suite algorithm: " + calculatePassedTime()
+							+ " seconds elapsed for PARMA alignment");
+
+			// folgendes verschieben!!!!!
+			MappingLogger.getLogger().debug(
+					"Convert SAM-file of PARA-suite mapped reads to BAM-file");
 			List<String> cleanUpCommandsList = new LinkedList<String>();
 			cleanUpCommandsList.add("samtools");
 			cleanUpCommandsList.add("view");
@@ -103,8 +123,14 @@ public class BWAMapping extends Mapping {
 			cleanUpCommandsList.add(outputPrefix + ".bam");
 			executeCommand(cleanUpCommandsList, StreamRedirect.ALL);
 
-			// MAYBE CHECK FOR MAPQFILTER EQUALS 0 AND THEN SKIP THE FOLLOWING
-			// STEP!!!
+			// vorübergehende lösung. die samtools commands müssen in Mapping
+			// aufgenommen und aus Main ausgeführt werden. das extract sollte
+			// vorher immer erfolgen, damit man die FASTQ weiter nutzen kann
+//			ExtractWeakMappingReads extract = new ExtractWeakMappingReads();
+//			extract.extractReads(outputPrefix + ".bam", outputPrefix
+//					+ ".new.bam", outputPrefix + ".unaligned.fastq", 10);
+//			renameFile(outputPrefix + ".new.bam", outputPrefix + ".bam");
+
 			MappingLogger.getLogger().debug(
 					"Filtering mapped reads with MAPQ lower than "
 							+ mappingQualityFilter);
@@ -139,14 +165,14 @@ public class BWAMapping extends Mapping {
 			executeCommand(cleanUpCommandsList, StreamRedirect.ALL);
 		} catch (IOException e) {
 			MappingLogger.getLogger().error(
-					"IO exception thrown in FirstMapping with "
+					"IO exception thrown in PARA-suite with "
 							+ "following error message:"
 							+ System.getProperty("line.separator")
 							+ e.getMessage());
 			e.printStackTrace();
 		} catch (InterruptedException e) {
 			MappingLogger.getLogger().error(
-					"Interrupted exception thrown in FirstMapping "
+					"Interrupted exception thrown in PARA-suite "
 							+ "with following error message:"
 							+ System.getProperty("line.separator")
 							+ e.getMessage());

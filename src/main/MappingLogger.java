@@ -36,10 +36,6 @@ public final class MappingLogger {
 		return logger;
 	}
 
-	// public static String getLoggingFile() {
-	// return loggingFile;
-	// }
-
 	public static void setLoggingFile(String loggingFile) {
 		MappingLogger.loggingFile = loggingFile;
 	}

@@ -1,5 +1,6 @@
 package utils.postprocessing;
 
+import htsjdk.samtools.CigarElement;
 import htsjdk.samtools.CigarOperator;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMFileWriter;
@@ -14,6 +15,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
 
 import main.MappingLogger;
 
@@ -103,6 +106,29 @@ public class CombineGenomeTranscript {
 					continue;
 				}
 
+				List<IndelTupel> indelTupelList = new LinkedList<IndelTupel>();
+				int cigarLengths = 0;
+				for (CigarElement cigarElem : readHit.getCigar()
+						.getCigarElements()) {
+					if (cigarElem.getOperator().equals(CigarOperator.D)
+							|| cigarElem.getOperator().equals(
+									CigarOperator.DELETION)
+							|| cigarElem.getOperator().equals(CigarOperator.I)
+							|| cigarElem.getOperator().equals(
+									CigarOperator.INSERTION)) {
+						// position maybe +1??
+						indelTupelList.add(new IndelTupel(cigarLengths + 1,
+								cigarElem.getOperator()));
+					}
+					cigarLengths += cigarElem.getLength();
+				}
+				for (IndelTupel indel : indelTupelList) {
+//					MappingLogger.getLogger().debug(
+//							"position: " + indel.getIndelPosition()
+//									+ " and type: "
+//									+ indel.getIndelType().toString());
+				}
+
 				// if (readHit.getReadName().equals(
 				// "HWI-ST737:305:C232HACXX:6:2106:2427:18829")) {
 				// MappingLogger.getLogger().debug("übereinstimmung transcript");
@@ -164,6 +190,8 @@ public class CombineGenomeTranscript {
 				// }
 				// }
 				int lengthPassed = 0;
+				int matchingPositionsPassed = 0;
+				boolean spliceJunctionCovered = false;
 				// int convertedBases = 0;
 				// int currentCigarElemIdx = 0;
 				// int passedCigarElemLength = 0;
@@ -198,6 +226,7 @@ public class CombineGenomeTranscript {
 								// -1;
 							}
 						}
+
 						if (readHit.getAlignmentEnd() <= lengthPassed) {
 							if (newGenomicPositionStart >= Integer
 									.parseInt(exonStarts[i])) {
@@ -217,19 +246,47 @@ public class CombineGenomeTranscript {
 								// if (true) {
 								// continue;
 								// }
-								if (readHit.getCigarString().contains(
-										CigarOperator.DELETION.toString())
-										|| readHit.getCigarString().contains(
-												CigarOperator.INSERTION
-														.toString())) {
-									missedTranscriptAlignments++;
-									break;
-								}
+								// if (readHit.getCigarString().contains(
+								// CigarOperator.DELETION.toString())
+								// || readHit.getCigarString().contains(
+								// CigarOperator.INSERTION
+								// .toString())) {
+								// if (!spliceJunctionCovered) {
+								// // just copy transcriptomic cigar until
+								// it is possible to the current position,
+								// inculding the indel
+								// int cigarElemLenghts = 0;
+								// for (CigarElement elem :
+								// readHit.getCigar().getCigarElements()) {
+								// cigarElemLenghts += elem.getLength();
+								// if (cigarElemLenghts >
+								// matchingPositionsPassed) {
+								//
+								// } else {
+								// newGenomicCigar += elem.toString();
+								// }
+								// }
+								// } else {
+								// // recalculate the actual indel position
+								// AFTER the exon-exon junction!
+								// }
+								// missedTranscriptAlignments++;
+								// break;
+								// }
 
 								// newGenomicCigar += readHit.getCigarString()
 								// .substring(convertedBases);
+
+//								MappingLogger.getLogger().debug(
+//										"matching positions passed before: "
+//												+ matchingPositionsPassed);
 								newGenomicCigar += (readHit.getAlignmentEnd() - lengthPassedTemp)
 										+ "M";
+								matchingPositionsPassed += (readHit
+										.getAlignmentEnd() - lengthPassedTemp);
+//								MappingLogger.getLogger().debug(
+//										"matching positions passed after: "
+//												+ matchingPositionsPassed);
 							}
 							break;
 						} else if (newGenomicPositionStart != -1) {
@@ -270,18 +327,39 @@ public class CombineGenomeTranscript {
 								// }
 								// }
 
+//								MappingLogger.getLogger().debug(
+//										"matching positions passed before: "
+//												+ matchingPositionsPassed);
+								matchingPositionsPassed += (Integer
+										.parseInt(exonEnds[i])
+										- newGenomicPositionStart + 1);
 								newGenomicCigar += (Integer
 										.parseInt(exonEnds[i])
 										- newGenomicPositionStart + 1) + "M";
+
+//								MappingLogger.getLogger().debug(
+//										"matching positions passed after: "
+//												+ matchingPositionsPassed);
 							} else {
 								// entire exon covered by read:
 								// KOMPLIZIERT?!?! VLLT. INT MITLAUFEN LASSEN UM
 								// START POS IM READ CIGAR ZU
 								// FINDEN?!?!?!?!??!?!?!
+
+//								MappingLogger.getLogger().debug(
+//										"matching positions passed before: "
+//												+ matchingPositionsPassed);
+								matchingPositionsPassed += (Integer
+										.parseInt(exonEnds[i])
+										- Integer.parseInt(exonStarts[i]) + 1);
 								newGenomicCigar += (Integer
 										.parseInt(exonEnds[i])
 										- Integer.parseInt(exonStarts[i]) + 1)
 										+ "M";
+
+//								MappingLogger.getLogger().debug(
+//										"matching positions passed after: "
+//												+ matchingPositionsPassed);
 								// newGenomicCigar += readHit
 								// .getCigarString()
 								// .substring(
@@ -304,6 +382,7 @@ public class CombineGenomeTranscript {
 									break;
 								}
 								newGenomicCigar += intronLength + "N";
+								spliceJunctionCovered = true;
 							} else {
 								break;
 							}
@@ -437,6 +516,7 @@ public class CombineGenomeTranscript {
 						}
 					}
 				}
+
 				// SEQ_ID:>ENST00000496359|10|81564241|81586109-2:3
 				// if (readHit.getReadName().equals(
 				// "SEQ_ID:>ENST00000476173|10|81839051|81851108-2:11")
@@ -488,21 +568,19 @@ public class CombineGenomeTranscript {
 				}
 				// END OF FOR OVER ALL READ-HITS
 			}
-			// hits for last readname are not yet saved, so evoke print-method
-			// one
-			// more time -- seems to make an error?!?!?!?
-			// printReadsToBamFile(readIDToRead);
+			// save hit for the last read
+			printReadsToBamFile(readIDToRead);
 
 			MappingLogger.getLogger().debug(
 					"an overall of " + mappedReads
 							+ " reads have high mapping potential.");
 			MappingLogger
 					.getLogger()
-					.debug("an overall of " + splicedReads
+					.info("an overall of " + splicedReads
 							+ " reads are spanning at least 1 splice junction!");
 			MappingLogger
 					.getLogger()
-					.debug(missedTranscriptAlignments
+					.info(missedTranscriptAlignments
 							+ " transcript alignments were skipped due to indels + splicing");
 
 			transcriptSamFileReader.close();

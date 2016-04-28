@@ -1,6 +1,9 @@
 package utils.pileupclusters;
 
 import htsjdk.samtools.AlignmentBlock;
+import htsjdk.samtools.CigarElement;
+import htsjdk.samtools.CigarOperator;
+import htsjdk.samtools.SAMException;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SamReader;
@@ -26,6 +29,9 @@ import org.math.plot.Plot2DPanel;
 
 /**
  * 
+ * Hierarchical clustering algorithm to pile up aligned reads into clusters
+ * representing RBP-bound regions identified by CLIP.
+ * 
  * @author akloetgen
  * 
  */
@@ -36,7 +42,23 @@ public class PileupClusters {
 	private int skippedDueIndel = 0;
 	private SNPCalling snpCalling;
 	private int snpHit;
+	private int highFrequentError;
 
+	/**
+	 * Apply hierarchical clustering and exclude T-C SNPs annotated in the SNP
+	 * VCF file.
+	 * 
+	 * @param alignmentFile
+	 *            BAM file of the read alignment
+	 * @param referenceFile
+	 *            indexed reference genome sequence file
+	 * @param outputFile
+	 *            file-prefix where all outputs are saved
+	 * @param snpVcfFile
+	 *            SNP db in a VCF format, requires tabix index!
+	 * @param minReadCoverage
+	 *            minimal coverage of reads per cluster, e.g. 5
+	 */
 	public void calculateReadPileups(String alignmentFile,
 			String referenceFile, String outputFile, String snpVcfFile,
 			int minReadCoverage) {
@@ -57,6 +79,7 @@ public class PileupClusters {
 					+ ".ccr.tsv");
 			FileWriter fileWriterAllelePositions = new FileWriter(mappingFile
 					+ ".sitepositions.tsv");
+			FileWriter fileWriterLog = new FileWriter(outputFile + ".report");
 			snpCalling = new SNPCalling(snpVcfFile);
 
 			if (!samFileReader.getFileHeader().getSortOrder()
@@ -114,7 +137,7 @@ public class PileupClusters {
 			for (SAMRecord readHit : samFileReader) {
 				numReadsProcessed++;
 				if (numReadsProcessed % 250000 == 0) {
-					MappingLogger.getLogger().debug(
+					MappingLogger.getLogger().info(
 							numReadsProcessed + " number reads processed.");
 					// break;
 				}
@@ -126,11 +149,13 @@ public class PileupClusters {
 
 				// INSERTION = READ IS LONGER
 				// DELETION = REFERENCE IS LONGER
-				if (readHit.getCigarString().contains("I")
-						|| readHit.getCigarString().contains("D")) {
+				if ((readHit.getCigarString().contains("I") || readHit
+						.getCigarString().contains("D"))
+						&& readHit.getCigarString().contains("N")) {
 					// TODO so far indel reads are not handled, so continue!
-					// continue;
-					// skippedDueIndel++;
+					skippedDueIndel++;
+					continue;
+
 					// MappingLogger.getLogger().debug(
 					// "CIGAR: " + readHit.getCigarString());
 					// byte readSequence[] = readHit.getReadBases();
@@ -147,70 +172,30 @@ public class PileupClusters {
 					// + readHit.getAlignmentBlocks().size());
 				}
 
-				// CHECK FOR TOO MANY ERRORS!! THIS CAN BE DONE SMARTER IN THE
-				// LOOP AT THE BOTTOM!!! this is not necessary for correct
-				// alignment, isnt it?
-				/*
-				 * int overallMutations = 0; byte readSequence[] =
-				 * readHit.getReadBases(); byte refSequenceForRead[] =
-				 * reference.getSubsequenceAt( readHit.getReferenceName(),
-				 * readHit.getAlignmentStart(), readHit.getAlignmentEnd())
-				 * .getBases(); if (readHit.getReadNegativeStrandFlag()) {
-				 * net.sf.samtools.util.SequenceUtil
-				 * .reverseComplement(readSequence);
-				 * net.sf.samtools.util.SequenceUtil
-				 * .reverseComplement(refSequenceForRead); } for (int i = 0; i <
-				 * readSequence.length; i++) { if
-				 * (calculateArrayPos(readSequence[i]) !=
-				 * calculateArrayPos(refSequenceForRead[i])) {
-				 * overallMutations++; } } if (overallMutations >
-				 * overallMutationsThreshold) {
-				 * 
-				 * StringBuffer tempReadSequence = new StringBuffer(); for (int
-				 * o = 0; o < readSequence.length; o++) {
-				 * tempReadSequence.append((char) readSequence[o]); }
-				 * StringBuffer tempRefSequence = new StringBuffer(); for (int o
-				 * = 0; o < refSequenceForRead.length; o++) {
-				 * tempRefSequence.append((char) refSequenceForRead[o]); }
-				 * MappingLogger.getLogger().debug( "read id: " +
-				 * readHit.getReadName() + "\nread seq: " + tempReadSequence +
-				 * "\nref seq: " + tempRefSequence);
-				 * 
-				 * continue; }
-				 */
-
 				if ((tempClusterEnd - readHit.getAlignmentStart()) < 5
 						|| !readHit.getReferenceName().equals(tempClusterChr)) {
 					// NEW CLUSTER FOUND!
 					boolean isSave = true;
-					// MappingLogger.getLogger().debug(
-					// "tempClusterEnd="
-					// + tempClusterEnd
-					// + "; readAlignmentStart="
-					// + readHit.getAlignmentStart()
-					// + "; result="
-					// + (tempClusterEnd - readHit
-					// .getAlignmentStart()));
 					double fractionT2CMutationPerCluster = 0.0;
 					if (numReadsPerCluster >= minReadCoverage) {
 						numT2CSitesPerCluster = mutationMap.size();
 						int tempBestMutationPos = -1;
 						double tempBestMutationValue = 0.0;
 
-						// EXCLUDE SNPs FROM FOUND T2C MUTATIONS WITHIN A
-						// CLUSTER
+						// exclude T-C SNPs and 100% T-C sites (most likely
+						// SNVs)
 						HashMap<Integer, Integer> mutationMapTemp = new HashMap<Integer, Integer>();
 						mutationMapTemp.putAll(mutationMap);
 						for (int mutationKey : mutationMap.keySet()) {
-							// MappingLogger.getLogger().debug(
-							// "test for SNP at " + tempClusterChr + ":"
-							// + mutationKey);
 							if (snpCalling.querySNP(tempClusterChr,
 									mutationKey, "T", "C")) {
 								mutationMapTemp.remove(mutationKey);
 								snpHit++;
 							}
-							// System.out.println(mutationKey);
+							if (mutationMap.get(mutationKey) == 1.0) {
+								highFrequentError++;
+								continue;
+							}
 						}
 						mutationMap.clear();
 						mutationMap.putAll(mutationMapTemp);
@@ -219,35 +204,19 @@ public class PileupClusters {
 							sortedT2CAmounts.clear();
 
 							for (int mutationKey : mutationMap.keySet()) {
-								// TEST FOR SNP?!?!?!?!?!
-								if (((double) mutationMap.get(mutationKey) / baseCoveredMap
-										.get(mutationKey)) == 1.0) {
-									// MappingLogger
-									// .getLogger()
-									// .debug("found 100% T-C, skip as this seems to be a SNP");
-									// AT THIS POINT, ALL INFOs HAVE TO BE
-									// DOWNCALCULATED!!!! SO FAR, SKIP THIS
-									// UNTIL REAL SNP FINDING IS IMPLEMENTED
-
-									// SNPs++;
-									// continue;
-								}
-								// GO ON AS USUAL
+								// This could be another check for unusual T-C
+								// conversion sites. So far excluded.
+								// if (((double) mutationMap.get(mutationKey) /
+								// baseCoveredMap
+								// .get(mutationKey)) == 1.0) {
+								// }
 								double mutationValue = (double) mutationMap
 										.get(mutationKey)
 										/ baseCoveredMap.get(mutationKey);
-								// MappingLogger.getLogger().debug(
-								// "mutVal=" + mutationValue
-								// + "; tempBestVal="
-								// + tempBestMutationValue);
+
 								if (mutationValue >= tempBestMutationValue) {
-									// MappingLogger.getLogger().debug(
-									// "CHANGE: mutKey=" + mutationKey);
 									tempBestMutationValue = mutationValue;
 									tempBestMutationPos = mutationKey;
-									// MappingLogger.getLogger().debug(
-									// "CHANGE: tempBestMutationPos="
-									// + tempBestMutationPos);
 								}
 								sortedT2CAmounts.add(mutationValue);
 							}
@@ -258,10 +227,7 @@ public class PileupClusters {
 							// is a T2C allele and not a sequencing error
 							// allele!! So check for high T2C, e.g. above 20%.
 							if (sortedT2CAmounts.size() == 0) {
-								// if (tempClusterStart == 20891481) {
-								// MappingLogger.getLogger().error(
-								// "Found 20891481. DO NOT SAVE");
-								// }
+								// ???
 								// isSave = false;
 							} else if (sumUpList(sortedT2CAmounts) >= 0.2) {
 								for (int k = 0; k < sortedT2CAmounts.size(); k++) {
@@ -290,27 +256,27 @@ public class PileupClusters {
 							}
 
 							for (Double t2cAmount : sortedT2CAmounts) {
-								// if (tempClusterStart == 17469751) {
-								// MappingLogger.getLogger().debug(
-								// "17469751: t2c-amount: "
-								// + t2cAmount);
-								//
-								// }
 								fractionT2CMutationPerCluster += t2cAmount;
 							}
 							// PRINT OUT CCR FILE FOR OTHER PURPOSES.
 							if (tempBestMutationPos > 0) {
 								// IS NOT ADJUSTED FOR SPLICED READS!!!
-								byte[] ccrSequenceBytes = reference
-										.getSubsequenceAt(tempClusterChr,
-												tempBestMutationPos - 20,
-												tempBestMutationPos + 20)
-										.getBases();
-								if (isReverse.getStrandOrientation()
-										.equals("-")) {
-									htsjdk.samtools.util.SequenceUtil
-											.reverseComplement(ccrSequenceBytes);
+								byte[] ccrSequenceBytes;
+								try {
+									ccrSequenceBytes = reference
+											.getSubsequenceAt(tempClusterChr,
+													tempBestMutationPos - 20,
+													tempBestMutationPos + 20)
+											.getBases();
+									if (isReverse.getStrandOrientation()
+											.equals("-")) {
+										htsjdk.samtools.util.SequenceUtil
+												.reverseComplement(ccrSequenceBytes);
+									}
+								} catch (SAMException e) {
+									ccrSequenceBytes = new byte[0];
 								}
+
 								StringBuffer ccrSequence = new StringBuffer();
 								for (int basePosition = 0; basePosition < ccrSequenceBytes.length; basePosition++) {
 									ccrSequence
@@ -349,10 +315,6 @@ public class PileupClusters {
 							}
 						}
 						if (isSave) {
-
-							// tempClusterBytes = reference.getSubsequenceAt(
-							// tempClusterChr, tempClusterStart,
-							// tempClusterEnd).getBases();
 							if (tempIsReverse) {
 								htsjdk.samtools.util.SequenceUtil
 										.reverseComplement(tempClusterBytes);
@@ -393,7 +355,6 @@ public class PileupClusters {
 					runningID++;
 					clusterID = "cl_" + runningID + "_" + tempClusterChr;
 					alleleFrequencyPositionsTemp = new boolean[51];
-					// numA2GMutationPerCluster = 0;
 
 					// calculate everything
 					numT2CMutationPerCluster = calculateClusterInformation(
@@ -404,87 +365,125 @@ public class PileupClusters {
 
 					// INITIAL CLUSTER SEQUENCE SET
 					tempClusterBytes = new byte[0];
-					for (AlignmentBlock block : readHit.getAlignmentBlocks()) {
-						byte[] tempReferenceSequence = reference
-								.getSubsequenceAt(
-										readHit.getReferenceName(),
-										block.getReferenceStart(),
-										block.getReferenceStart()
-												+ block.getLength() - 1)
-								.getBases();
-						tempClusterBytes = mergeByteArrays(tempClusterBytes,
-								tempReferenceSequence);
+					// readHit.getCigar().getCigarElement(0).getLength()
+
+					int currentBlockStartPosition = readHit.getAlignmentStart();
+					// for (AlignmentBlock block : readHit.getAlignmentBlocks())
+					// {
+					for (CigarElement cigarElem : readHit.getCigar()
+							.getCigarElements()) {
+						byte[] tempReferenceSequence;
+						// if (!readHit.getReadNegativeStrandFlag()) {
+
+						// tempReferenceSequence = reference.getSubsequenceAt(
+						// readHit.getReferenceName(),
+						// block.getReferenceStart(),
+						// block.getReferenceStart() + block.getLength()
+						// - 1).getBases();
+
+						if (cigarElem.getOperator().equals(CigarOperator.D)
+								|| cigarElem.getOperator().equals(
+										CigarOperator.M)) {
+							tempReferenceSequence = reference.getSubsequenceAt(
+									readHit.getReferenceName(),
+									currentBlockStartPosition,
+									currentBlockStartPosition
+											+ cigarElem.getLength() - 1)
+									.getBases();
+							tempClusterBytes = mergeByteArrays(
+									tempClusterBytes, tempReferenceSequence);
+
+							// currentBlockStartPosition +=
+							// cigarElem.getLength();
+							// } else if (cigarElem.equals(CigarOperator.I)
+							// || cigarElem.equals(CigarOperator.N)) {
+							// // TODO nothing todo here? delete?!
+						}
+						if (!cigarElem.getOperator().equals(CigarOperator.I)) {
+							currentBlockStartPosition += cigarElem.getLength();
+						}
+						// } else {
+						// tempReferenceSequence = reference.getSubsequenceAt(
+						// readHit.getReferenceName(),
+						// block.getReferenceStart() + 1,
+						// block.getReferenceStart()
+						// + block.getLength()).getBases();
+						// }
+
+						// blockNumber++;
 					}
 
 				} else {
 					// MEMBER FOR PREVIOUS CLUSTER FOUND!
 					// calculate everything
 					tempClusterChr = readHit.getReferenceName();
-					// if (readHit.getAlignmentStart() < tempClusterStart) {
 
-					// byte[] additionalNucs = reference.getSubsequenceAt(
-					// readHit.getReferenceName(),
-					// readHit.getAlignmentStart(), tempClusterStart)
-					// .getBases();
-					// tempClusterStart = readHit.getAlignmentStart();
-
-					// UPDATE CLUSTER SEQ
-
-					// }
 					if (readHit.getAlignmentEnd() > tempClusterEnd) {
 						// UPDATE CLUSTER SEQ
-						// if (tempClusterStart == 71146850) {
-						// MappingLogger.getLogger().debug(
-						// "Found 71146850. Process additional read");
-						// }
-						for (AlignmentBlock block : readHit
-								.getAlignmentBlocks()) {
-							// MappingLogger.getLogger().debug(
-							// "block start in ref: "
-							// + block.getReferenceStart());
-							if ((block.getReferenceStart() + block.getLength() - 1) < tempClusterEnd) {
+						// for (AlignmentBlock block : readHit
+						// .getAlignmentBlocks()) {
+						int currentBlockStartPosition = readHit
+								.getAlignmentStart();
+						for (CigarElement cigarElem : readHit.getCigar()
+								.getCigarElements()) {
+							if ((currentBlockStartPosition
+									+ cigarElem.getLength() - 1) < tempClusterEnd) {
+								if (!cigarElem.getOperator().equals(
+										CigarOperator.I)) {
+									currentBlockStartPosition += cigarElem
+											.getLength();
+								}
 								continue;
 							}
+							if (cigarElem.getOperator().equals(CigarOperator.D)
+									|| cigarElem.getOperator().equals(
+											CigarOperator.M)) {
+								byte[] additionalNucs = reference
+										.getSubsequenceAt(
+												readHit.getReferenceName(),
+												currentBlockStartPosition,
+												currentBlockStartPosition
+														+ cigarElem.getLength()
+														- 1).getBases();
 
-							byte[] additionalNucs = reference.getSubsequenceAt(
-									readHit.getReferenceName(),
-									block.getReferenceStart(),
-									block.getReferenceStart()
-											+ block.getLength() - 1).getBases();
-							int overhangPosition = tempClusterEnd
-									- block.getReferenceStart() - 1;
-							// if (tempClusterStart == 71146850) {
-							// MappingLogger
-							// .getLogger()
-							// .debug("Found 71146850. adds nucs to the end with overhangPos = "
-							// + overhangPosition
-							// + " and length "
-							// + (block.getReferenceStart()
-							// + block.getLength() - 1
-							// - tempClusterEnd - overhangPosition));
-							// }
-							if (overhangPosition > 0) {
-								// if (tempClusterStart == 71146850) {
-								// MappingLogger.getLogger().debug(
-								// "Found 71146850. merge with 0 - "
-								// + tempClusterBytes.length
-								// + " and "
-								// + overhangPosition + "-"
-								// + block.getLength());
+								int overhangPosition = tempClusterEnd
+										- currentBlockStartPosition + 1;
+								if (overhangPosition > 0) {
+
+									tempClusterBytes = mergeByteSubArrays(
+											tempClusterBytes, 0,
+											tempClusterBytes.length,
+											additionalNucs, overhangPosition,
+											cigarElem.getLength());
+
+								} else {
+									// MappingLogger
+									// .getLogger()
+									// .debug("overhangpositions < 0 ---> WHY?!?!?!?!?");
+									tempClusterBytes = mergeByteArrays(
+											additionalNucs, tempClusterBytes);
+								}
+								// if (clusterID
+								// .equals("cl_37_chr6:36673421-36675326")) {
+								// StringBuffer tempBuffer = new StringBuffer();
+								// for (int i = 0; i < tempClusterBytes.length;
+								// i++)
+								// {
+								// tempBuffer
+								// .append((char) tempClusterBytes[i]);
 								// }
-								tempClusterBytes = mergeByteSubArrays(
-										tempClusterBytes, 0,
-										tempClusterBytes.length,
-										additionalNucs, overhangPosition,
-										block.getLength());
-							} else {
-								tempClusterBytes = mergeByteArrays(
-										additionalNucs, tempClusterBytes);
+								// MappingLogger.getLogger().debug(
+								// "tempCLsuterBytes after concat: "
+								// + tempBuffer);
+								// }
 							}
-
+							tempClusterEnd = readHit.getAlignmentEnd();
+							if (!cigarElem.getOperator()
+									.equals(CigarOperator.I)) {
+								currentBlockStartPosition += cigarElem
+										.getLength();
+							}
 						}
-
-						tempClusterEnd = readHit.getAlignmentEnd();
 					}
 					numReadsPerCluster++;
 
@@ -492,24 +491,27 @@ public class PileupClusters {
 							readHit, isReverse, mutationMap, baseCoveredMap,
 							alleleFrequencyPositionsTemp,
 							numT2CMutationPerCluster);
-					// MappingLogger.getLogger().debug("temP: " +
-					// tempIsReverse);
-					// if (isReverse.getReverse() == null) {
-					// MappingLogger.getLogger().debug("isRev = null");
-					// } else {
-					// MappingLogger.getLogger().debug(
-					// "isRev = " + isReverse.getReverse());
-					//
-					// }
 					if (isReverse.getReverse() != null
 							&& tempIsReverse != isReverse.getReverse()) {
 						doubleStranded++;
-						// MappingLogger.getLogger().debug(
-						// "double stranded found.");
 						isReverse.setReverse(null);
 					}
 				}
 			}
+
+			fileWriterLog.write("Double stranded clusters found: "
+					+ doubleStranded + System.getProperty("line.separator"));
+			fileWriterLog.write("Loci found that are SNPs: " + SNPs
+					+ System.getProperty("line.separator"));
+			fileWriterLog.write(skippedDueIndel
+					+ " insertion or deletion skipped"
+					+ System.getProperty("line.separator"));
+			fileWriterLog.write("T-C mutations identified as SNPs: " + snpHit
+					+ System.getProperty("line.separator"));
+			fileWriterLog
+					.write("T-C mutations identified as SNVs (100% T-C in 1 site): "
+							+ highFrequentError
+							+ System.getProperty("line.separator"));
 
 			MappingLogger.getLogger().debug(
 					"Double stranded clusters found: " + doubleStranded);
@@ -519,6 +521,9 @@ public class PileupClusters {
 					skippedDueIndel + "insertion or deletion skipped");
 			MappingLogger.getLogger().debug(
 					"T-C mutations identified as SNPs: " + snpHit);
+			MappingLogger.getLogger().debug(
+					"T-C mutations identified as SNVs (100% T-C in 1 site): "
+							+ highFrequentError);
 
 			// LETZTER CLUSTER WIRD NOCH NICHT EINGETRAGEN!!! NACHHOLEN!!! EVTL
 			// WRITING METHODE AUSLAGERN UND 2 MAL AUFRUFEN?!??!!
@@ -568,6 +573,7 @@ public class PileupClusters {
 			fileWriterCCRsFASTA.close();
 			fileWriterCCRsInfo.close();
 			fileWriterAllelePositions.close();
+			fileWriterLog.close();
 
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
@@ -583,26 +589,12 @@ public class PileupClusters {
 		byte tempReadSequence[] = readHit.getReadBases();
 		byte readSequence[] = new byte[0];
 		byte refSequenceForRead[] = new byte[0];
-		// for (CigarElement elem : readHit.getCigar().getCigarElements()) {
-		// if (elem.equals(CigarOperator.M.toString())) {
-		//
-		// }
-		// }
+
 		for (AlignmentBlock block : readHit.getAlignmentBlocks()) {
-			// int currentReadSequenceLength = 0;
-			// if (readSequence.length > 0) {
-			// currentReadSequenceLength = readSequence.length + 1;
-			// }
 			readSequence = mergeByteSubArrays(readSequence, 0,
 					readSequence.length, tempReadSequence,
 					block.getReadStart() - 1,
 					block.getReadStart() - 1 + block.getLength());
-			// if (readHit.getCigarString().contains("D")) {
-			//
-			// MappingLogger.getLogger().debug(
-			// "Block-start: " + block.getReadStart()
-			// + "; block-end: " + blockEnd);
-			// }
 			byte[] tempReferenceSequence = reference.getSubsequenceAt(
 					readHit.getReferenceName(), block.getReferenceStart(),
 					block.getReferenceStart() + block.getLength() - 1)
@@ -610,10 +602,7 @@ public class PileupClusters {
 			refSequenceForRead = mergeByteArrays(refSequenceForRead,
 					tempReferenceSequence);
 		}
-		// byte refSequenceForRead[] = reference.getSubsequenceAt(
-		// readHit.getReferenceName(), readHit.getAlignmentStart(),
-		// readHit.getAlignmentEnd()).getBases();
-		// int startPosition;
+
 		if (readHit.getReadNegativeStrandFlag()) {
 			htsjdk.samtools.util.SequenceUtil.reverseComplement(readSequence);
 			htsjdk.samtools.util.SequenceUtil
@@ -621,18 +610,6 @@ public class PileupClusters {
 			if (isReverse != null) {
 				isReverse.setReverse(true);
 			}
-
-			// StringBuffer tempReadSequence = new StringBuffer();
-			// for (int o = 0; o < readSequence.length; o++) {
-			// tempReadSequence.append((char) readSequence[o]);
-			// }
-			// MappingLogger.getLogger().debug(
-			// "read id: " + read.getReadName() + "read seq: "
-			// + tempReadSequence);
-
-			// startPosition = read.getAlignmentEnd();
-			// } else {
-			// startPosition = read.getAlignmentStart();
 		}
 
 		// if (readSequence.length != refSequenceForRead.length) {
@@ -643,8 +620,9 @@ public class PileupClusters {
 		// // MappingLogger.getLogger().debug(
 		// // "reflength=" + refSequenceForRead.length
 		// // + " and readlenght=" + readSequence.length);
-		// MappingLogger.getLogger().debug(
-		// "Cigar: " + readHit.getCigarString());
+
+		// MappingLogger.getLogger().debug("Cigar: " +
+		// readHit.getCigarString());
 		// StringBuffer tempRefSequence = new StringBuffer();
 		// StringBuffer tempReadSequenceBuffer = new StringBuffer();
 		// for (int i = 0; i < refSequenceForRead.length; i++) {
@@ -652,13 +630,9 @@ public class PileupClusters {
 		// tempReadSequenceBuffer.append((char) readSequence[i]);
 		// }
 		//
-		// MappingLogger.getLogger()
-		// .debug("ref sequence:\t" + tempRefSequence);
+		// MappingLogger.getLogger().debug("ref sequence:\t" + tempRefSequence);
 		// MappingLogger.getLogger().debug(
 		// "readsequence:\t" + tempReadSequenceBuffer);
-		//
-		// return 0;
-		// }
 
 		for (int i = 0; i < readSequence.length; i++) {
 			int checkPosition;
@@ -668,19 +642,14 @@ public class PileupClusters {
 				checkPosition = readHit.getAlignmentStart() + i;
 			}
 			// CHECK FOR ALL MUTATIONS! IN CASE THAT THERE IS A SHIFTED
-			// ALIGNMENT VS.
-			// TRANSCRIPTOME, THIS WILL PRODUCE AN ERROR! DO NOT OUTPUT THOSE
-			// ALIGNMENTS/CLUSTERS!
+			// ALIGNMENT VS. TRANSCRIPTOME, THIS WILL PRODUCE AN ERROR! DO NOT
+			// OUTPUT THOSE ALIGNMENTS/CLUSTERS!
 			// if (readSequence[i] != refSequenceForRead[i]) {
 			// overallMutations++;
 			// }
 
 			if (calculateArrayPos(refSequenceForRead[i]) == 3
 					&& calculateArrayPos(readSequence[i]) == 1) {
-				// if (!snpCalling.querySNP(readHit.getReferenceName(),
-				// checkPosition, "T", "C")) {
-				// snpHit++;
-				// } else {
 				numT2CMutationPerCluster++;
 				mutationMapInRead[i] = true;
 				if (mutationMap.containsKey(checkPosition)) {
@@ -689,12 +658,7 @@ public class PileupClusters {
 				} else {
 					mutationMap.put(checkPosition, 1);
 				}
-				// }
-			}/*
-			 * else if (isAllowForAG && ((refSequenceForRead[i] == 65 &&
-			 * readSequence[i] == 71) || (refSequenceForRead[i] == 97 &&
-			 * readSequence[i] == 103))) { numA2GMutationPerCluster++; }
-			 */
+			}
 			if (baseCoveredMap.containsKey(checkPosition)) {
 				baseCoveredMap.put(checkPosition,
 						baseCoveredMap.get(checkPosition) + 1);
@@ -772,7 +736,6 @@ public class PileupClusters {
 			int array1End, byte[] array2, int array2Start, int array2End) {
 		byte[] tempByteArray = new byte[(array1End - array1Start)
 				+ (array2End - array2Start)];
-
 		for (int i = array1Start; i < array1End; i++) {
 			tempByteArray[i] = array1[i];
 		}

@@ -25,8 +25,7 @@ import org.math.plot.Plot2DPanel;
 
 /**
  * 
- * represents the profile HMM to store data on error profile for particular
- * sequencing run
+ * Represents the error profile for particular a sequencing run
  * 
  * @author akloetgen
  * 
@@ -49,6 +48,9 @@ public class ErrorProfiling {
 	private double[] insertionsPerPos;
 	private double[] deletionsPerPos;
 	private int[] totalCountsPerPos;
+	private String[] basePositions;
+	private int totalBasesChecked;
+	private int totalBasesMissed;
 
 	@SuppressWarnings("unchecked")
 	public ErrorProfiling(String mappingFileName, String referenceFileName,
@@ -71,8 +73,23 @@ public class ErrorProfiling {
 		insertionsPerPos = new double[this.maxReadLength];
 		deletionsPerPos = new double[this.maxReadLength];
 		totalCountsPerPos = new int[this.maxReadLength];
+		basePositions = new String[4];
+		basePositions[0] = "A";
+		basePositions[1] = "C";
+		basePositions[2] = "G";
+		basePositions[3] = "T";
+		totalBasesChecked = 0;
+		totalBasesMissed = 0;
 	}
 
+	/**
+	 * Infers the error profile of a given sequencing run.
+	 * 
+	 * @param isInferQualities
+	 *            whether base calling qualities should be measured
+	 * @param isShowErrorPlot
+	 *            whether error profile should be plotted
+	 */
 	public void inferErrorProfile(boolean isInferQualities,
 			boolean isShowErrorPlot) {
 		try {
@@ -81,21 +98,19 @@ public class ErrorProfiling {
 					.enable(SamReaderFactory.Option.INCLUDE_SOURCE_IN_RECORDS)
 					.validationStringency(ValidationStringency.LENIENT);
 			SamReader samFileReader = factory.open(mappingFile);
-			// File mappingFile = new File(mappingFileName);
-			// SAMFileReader samFileReader = new SAMFileReader(mappingFile);
 
 			IndexedFastaSequenceFile reference = new IndexedFastaSequenceFile(
 					new File(referenceFileName));
 			FileWriter fileWriterProfile = new FileWriter(mappingFile
 					+ ".errorprofile");
+			FileWriter fileWriterVCFProfile = new FileWriter(mappingFile
+					+ ".errorprofile.vcf");
 			FileWriter fileWriterIndels = new FileWriter(mappingFile
 					+ ".indels");
 			FileWriter fileWriterIndelsMean = new FileWriter(mappingFile
 					+ ".indelprofile");
 			FileWriter fileWriterQualities = new FileWriter(mappingFile
 					+ ".qualities");
-
-			// try to use the iterator for establishing multi threading
 
 			if (!samFileReader.getFileHeader().getSortOrder()
 					.equals(SAMFileHeader.SortOrder.coordinate)) {
@@ -116,48 +131,18 @@ public class ErrorProfiling {
 			int skippedReads = 0;
 			int longerIndels = 0;
 
-			// MappingLogger.getLogger().debug("counting reads started");
-			// int mappedReads = 0;
-			// for (SAMRecord readHit : samFileReader) {
-			// mappedReads++;
-			// }
-			// MappingLogger.getLogger().debug(
-			// "counting reads finished; " + mappedReads
-			// + " were counted.");
+			boolean isFilter = false;
 
-			// MappingLogger.getLogger().debug("separating reads started");
-			//
-			// // for (int z = 0; z < threads; z++) {
-			// for (SAMRecord readHit : samFileReader) {
-			//
-			// for (int r = 0; r < (int) threads / mappedReads; r++) {
-			// // will create 20 mio. SAMRecord objects -> not practicable
-			// }
-			//
-			// }
-			// MappingLogger.getLogger().debug("separating reads finished");
-
-			// MAYBE RUN EACH READ ANALYSIS ON A SINGLE THREAD?!?! BUT PROBABLY
-			// INVOKING THREADS COSTS MORE TIME THAN JUST LET IT RUN!??! MAYBE
-			// TRUE FOR ONLY 2-3 THREADS?!?!
-
-			// SO, CREATE 10 THREADS, GO THROUGH SAMFILEREADER AND START THE
-			// NEXT FREE THREAD WITH THIS SAMRECROD, GO TO NEXT AND WAIT FOR THE
-			// NEXT FREE THREAD AND SO ON; IN THE END, COMBINE ALL 10
-			// TEMP_STATISTICS AS THEY ARE NOT WRITE-PROTECTED WHILE USING 10
-			// THREADS!?!?!!!!!
-
-			// QueryInterval[] intervals = new QueryInterval[threads];
-			// SAMRecordIterator it = samFileReader.query(intervals, true);
-			// while(it.hasNext()) {
+			// multi-threading missing. Still very slow...
 			for (SAMRecord readHit : samFileReader) {
-				// SAMRecord readHit = it.next();
-				// for (samFileReader.iterator()) {
-
-				// HERE IS AN IDEA!!!!
-				// int useThreadIndexForTempStatistics = numReadsProcessed
-				// % threads;
-
+				// StringBuffer readSeq = new StringBuffer();
+				// for (int basePosition = 0; basePosition < readHit
+				// .getReadBases().length; basePosition++) {
+				// readSeq.append(Character.toUpperCase((char) readHit
+				// .getReadBases()[basePosition]));
+				// }
+				// System.out.println("readHit=" + readHit.getReadName()
+				// + " with seq=" + readSeq);
 				if (readHit.getReadUnmappedFlag()) {
 					unmapped++;
 					continue;
@@ -179,9 +164,8 @@ public class ErrorProfiling {
 
 				numReadsProcessed++;
 				if (numReadsProcessed % 250000 == 0) {
-					MappingLogger.getLogger().debug(
+					MappingLogger.getLogger().info(
 							numReadsProcessed + " number reads processed");
-					// break;
 				}
 
 				if (refSequenceForRead[0] == 0) {
@@ -192,29 +176,23 @@ public class ErrorProfiling {
 				// rev-compl, because no mismatch information is needed and
 				// cigar string is for the forward strand
 				boolean skip = false;
+				int mappingLength;
+				if (readSequence.length > refSequenceForRead.length) {
+					mappingLength = readSequence.length;
+				} else {
+					mappingLength = refSequenceForRead.length;
+				}
 				if (readSequence.length != refSequenceForRead.length) {
-					// refSequenceForRead = reference.getSubsequenceAt(
-					// readHit.getReferenceName(),
-					// readHit.getAlignmentStart(),
-					// readHit.getAlignmentEnd()).getBases();
-					byte refSequenceForReadTemp[] = new byte[readSequence.length];
-					// MappingLogger.getLogger().debug(
-					// "NEXT: stradn: "
-					// + readHit.getReadNegativeStrandFlag());
+					byte refSequenceForReadTemp[] = new byte[mappingLength];
+					byte readSequenceTemp[] = new byte[mappingLength];
+
 					// TODO
 					// USE ALIGNMENT_BLOCKS, TAKE LENGHT + REF_START TO
 					// RECONSTRUCT BOTH BYTE_ARRAYS AND USE -1/-2 FOR INDELS
 
-					// System.out.println("read sequence vs. ref sequence");
-					// for (int i = 0; i < readSequence.length; i++) {
-					// System.out.print(readSequence[i]);
-					// }
-					// System.out.println();
-					// for (int i = 0; i < refSequenceForRead.length; i++) {
-					// System.out.print(refSequenceForRead[i]);
-					// }
-					// System.exit(0);
 					int passed = 0;
+					int passedRef = 0;
+					int passedRead = 0;
 					int passedMatches = 0;
 					for (CigarElement elem : readHit.getCigar()
 							.getCigarElements()) {
@@ -224,89 +202,53 @@ public class ErrorProfiling {
 						// NUMBERS; HOW TO IGNORE THEMN LATER??!?! BY INDICATING
 						// THAT WITH A NEW BYTE in the byte-array?!?!?!?!?
 
-						if (elem.getOperator().toString()
-								.equals(CigarOperator.M.toString())) {
-							// MappingLogger.getLogger()
-							// .debug("matches: "
-							// + elem.getOperator().toString());
-							// MappingLogger
-							// .getLogger()
-							// .debug("passedMatches: "
-							// + passedMatches
-							// + "; passed: "
-							// + passed
-							// + "; length elem: "
-							// + elem.getLength()
-							// + "; byte array size: "
-							// + refSequenceForReadTemp.length
-							// + "; CIGAR: "
-							// + readHit.getCigarString()
-							// + "; strand: "
-							// + readHit
-							// .getReadNegativeStrandFlag());
-
+						if (elem.getOperator().equals(CigarOperator.M)
+								|| elem.getOperator().equals(CigarOperator.X)
+								|| elem.getOperator().equals(CigarOperator.EQ)) {
 							for (int z = 0; z < elem.getLength(); z++) {
 								try {
 									refSequenceForReadTemp[z + passedMatches] = refSequenceForRead[z
-											+ passed];
+											+ passedRef];
+									// if (readHit.getCigar().getCigarElements()
+									// .contains(CigarOperator.D)) {
+									// System.out.println("start="
+									// + readHit.getAlignmentStart()
+									// + " and end="
+									// + readHit.getAlignmentEnd());
+									readSequenceTemp[z + passedMatches] = readSequence[z
+											+ passedRead];
+									// }
 								} catch (ArrayIndexOutOfBoundsException e) {
 									// SKIP!!! UNRESOLVED ERROR!!!!!!!!!!!!!!
+									// i think this error is resolved, but
+									// should be tested...
+									MappingLogger.getLogger().error(
+											"random error. sorry.");
+									// e.printStackTrace();
 									skip = true;
-									// MappingLogger.getLogger()
-									// .debug("CIGAR="
-									// + readHit.getCigarString());
 								}
-								// MappingLogger.getLogger().debug(
-								// "read: "
-								// + readSequence[passedMatches
-								// + z]
-								// + "; refNew: "
-								// + refSequenceForReadTemp[z
-								// + passedMatches]);
 							}
 							passedMatches += elem.getLength();
-							passed += elem.getLength();
-
-							// } else {
-							// MappingLogger.getLogger().debug(
-							// "no matches: "
-							// + readHit.getCigar()
-							// .getCigarElement(z)
-							// .getLength());
-							// passed += elem.getLength();
+							passedRef += elem.getLength();
+							passedRead += elem.getLength();
 						} else if (elem.getOperator().toString()
 								.equals(CigarOperator.N.toString())) {
-							passed += elem.getLength();
+							// passed += elem.getLength();
+							passedRef += elem.getLength();
+							passedRead += elem.getLength();
 						} else if (elem.getOperator().toString()
 								.equals(CigarOperator.I.toString())) {
 							// read is LONGER than reference
-							// MappingLogger.getLogger().debug(
-							// "read length: " + readSequence.length
-							// + "; ref length: "
-							// + refSequenceForRead.length
-							// + "; ref temp length: "
-							// + refSequenceForReadTemp.length
-							// + "; cigar length: "
-							// + elem.getLength());
-							// MappingLogger
-							// .getLogger()
-							// .debug("I match: passedMatches: "
-							// + passedMatches
-							// + "; passed: "
-							// + passed
-							// + "; length elem: "
-							// + elem.getLength()
-							// + "; byte array size: "
-							// + refSequenceForReadTemp.length
-							// + "; CIGAR: "
-							// + readHit.getCigarString()
-							// + "; strand: "
-							// + readHit
-							// .getReadNegativeStrandFlag());
+
 							for (int z = 0; z < elem.getLength(); z++) {
-								refSequenceForReadTemp[passedMatches + z] = -1;
+								refSequenceForReadTemp[passedMatches + z] = 45;
+								// readSequenceTemp[passedMatches + z] =
+								// readSequence[passed
+								// + z];
 							}
 							passedMatches += elem.getLength();
+							passedRead += elem.getLength();
+
 							for (int q = 1; q <= elem.getLength(); q++) {
 								insertionsPerPos[passedMatches + q] += 1.0;
 							}
@@ -316,6 +258,18 @@ public class ErrorProfiling {
 
 						} else if (elem.getOperator().toString()
 								.equals(CigarOperator.D.toString())) {
+
+							// read is SHORTER than reference
+							for (int z = 0; z < elem.getLength(); z++) {
+								readSequenceTemp[passedMatches + z] = 45;
+								// refSequenceForReadTemp[passedMatches + z] =
+								// refSequenceForRead[passed
+								// + z];
+							}
+							passedMatches += elem.getLength();
+							passedRef += elem.getLength();
+							// passed += elem.getLength();
+
 							for (int q = 1; q <= elem.getLength(); q++) {
 								deletionsPerPos[passedMatches + q] += 1.0;
 							}
@@ -323,56 +277,13 @@ public class ErrorProfiling {
 							if (elem.getLength() > 1) {
 								longerIndels++;
 							}
-							// read is SHORTER than reference
-							// MappingLogger.getLogger().debug(
-							// "read length: " + readSequence.length
-							// + "; ref length: "
-							// + refSequenceForRead.length
-							// + "; ref temp length: "
-							// + refSequenceForReadTemp.length
-							// + "; cigar length: "
-							// + elem.getLength());
-							// MappingLogger
-							// .getLogger()
-							// .debug("D match: passedMatches: "
-							// + passedMatches
-							// + "; passed: "
-							// + passed
-							// + "; length elem: "
-							// + elem.getLength()
-							// + "; byte array size: "
-							// + refSequenceForReadTemp.length
-							// + "; CIGAR: "
-							// + readHit.getCigarString()
-							// + "; strand: "
-							// + readHit
-							// .getReadNegativeStrandFlag());
+
 						}
-
-						// z++;
-						// readHit.getCigar().getCigarElement(0);
 					}
-					// MappingLogger.getLogger().debug(
-					// "read length: " + readSequence.length
-					// + "; ref length: "
-					// + refSequenceForRead.length + "; cigar: "
-					// + readHit.getCigarString());
-					// for (AlignmentBlock block : readHit.getAlignmentBlocks())
-					// {
-					// MappingLogger.getLogger().debug(
-					// "block length: " + block.getLength());
-					//
-					// }
-
 					indelRead++;
 					refSequenceForRead = refSequenceForReadTemp;
-					// System.exit(0);
-					// skippedReads++;
-					// continue;
+					readSequence = readSequenceTemp;
 				}
-
-				// MappingLogger.getLogger().debug(
-				// "readHit: " + readHit.getReadName());
 
 				byte[] readQualities = readHit.getBaseQualities();
 				int error = 0;
@@ -385,23 +296,15 @@ public class ErrorProfiling {
 				// create rev-compl if negative strand flag is set to calculate
 				// correct mismatches
 				if (readHit.getReadNegativeStrandFlag()) {
-					// rev compl vom Read wird im BAM-File gespeichert wenn
-					// rev-strand!! Getestet an MSI1 PARCLIP Datensatz!!! :)
-
 					htsjdk.samtools.util.SequenceUtil
 							.reverseComplement(readSequence);
 					htsjdk.samtools.util.SequenceUtil
 							.reverseComplement(refSequenceForRead);
-
 				}
 
 				for (int i = 0; i < readSequence.length; i++) {
 					int arrayPosRef = calculateArrayPos(refSequenceForRead[i]);
 					int arrayPosRead = calculateArrayPos(readSequence[i]);
-
-					// MappingLogger.getLogger().debug(
-					// "read: " + readSequence[i] + "; ref: "
-					// + refSequenceForRead[i]);
 
 					if (arrayPosRef != arrayPosRead) {
 						error++;
@@ -411,33 +314,62 @@ public class ErrorProfiling {
 					// read, thereby reducing this chance to 37.5% i would
 					// postulate an error threshold of around 30% of the read
 					// length.
-					if (error >= (readSequence.length * 30 / 100)) {
+					if (error >= (readSequence.length * 30 / 100) && isFilter) {
 						// skip these reads, because they originate from spliced
 						// alignments that are 1 or 2 nucs shifted because of
-						// wrong
-						// exon annotations. maybe could be solver smarter OR
-						// can be corrected?!?!??!
+						// wrong exon annotations. maybe could be solved smarter
+						// OR can be corrected?!?!??!
+
+						// i found a few examples in the ensembl genes v75 db
+						// where wrong annotations led to those errors. Maybe
+						// resolved on hg38 and Ensembl genes v78?
 						skippedReads++;
 						skip = true;
-						// System.exit(0);
 						break;
 					}
 				}
 				if (skip) {
 					continue;
 				}
-				// if (readHit.getReadName().equals(
-				// "SEQ_ID:>ENST00000492267|3|82855666|82857172-2:6")) {
-				// MappingLogger.getLogger().debug(
-				// "FOUND: with errors: " + error);
-				// }
-
 				for (int i = 0; i < readSequence.length; i++) {
 					int arrayPosRef = calculateArrayPos(refSequenceForRead[i]);
 					int arrayPosRead = calculateArrayPos(readSequence[i]);
 
+					int refPos = -1;
+					if (readHit.getReadNegativeStrandFlag()) {
+						refPos = i + readHit.getAlignmentStart();
+					} else {
+						refPos = readHit.getAlignmentEnd() - i;
+					}
+
+					StringBuffer readSeq = new StringBuffer();
+					for (int basePosition = 0; basePosition < readSequence.length; basePosition++) {
+						readSeq.append(Character
+								.toUpperCase((char) readSequence[basePosition]));
+					}
+					StringBuffer refSeq = new StringBuffer();
+					for (int basePosition = 0; basePosition < refSequenceForRead.length; basePosition++) {
+						refSeq.append(Character
+								.toUpperCase((char) refSequenceForRead[basePosition]));
+					}
+//					if (arrayPosRef == 0 && arrayPosRead == 2) {
+//						System.out.println("A to G hit in read="
+//								+ readHit.getReadName() + " with seq="
+//								+ readSeq + " and ref-seq=" + refSeq);
+//					}
+
 					if (arrayPosRef >= 0 && arrayPosRead >= 0) {
 						positionConversions[i][arrayPosRef][arrayPosRead]++;
+						totalBasesChecked++;
+					} else {
+						// System.out.println("wrong bases: REF=" + arrayPosRef
+						// + " (" + refSequenceForRead[i]
+						// + " at position " + refPos + ")" + "\tREAD="
+						// + arrayPosRead + " (" + readSequence[i]
+						// + " at position " + i + ")" + " for read "
+						// + readHit.getReadName() + " orient="
+						// + readHit.getReadNegativeStrandFlag());
+						// totalBasesMissed++;
 					}
 					if (isInferQualities) {
 						// um hier aus der liste ein array zu machen müsste die
@@ -446,14 +378,6 @@ public class ErrorProfiling {
 						baseQualitiesPerPosMean[i] += readQualities[i];
 					}
 				}
-
-				// calculate SD for base qualities
-				// if (isInferQualities) {
-				// for (int i = 0; i < readSequence.length; i++) {
-				// baseQualitiesPerPosSd[i]
-				// }
-				// }
-
 			}
 			double percentIndelReads = (double) indelRead / numReadsProcessed;
 			MappingLogger.getLogger().debug(
@@ -462,11 +386,11 @@ public class ErrorProfiling {
 							+ "; startZero: " + startZero + "; %indelReads: "
 							+ percentIndelReads
 							+ "; skippedReads with >5 errors: " + skippedReads
-							+ "; longer Indels: " + longerIndels);
+							+ "; longer Indels: " + longerIndels
+							+ "; totalBasesChecked=" + totalBasesChecked
+							+ "; totalBasesMissed=" + totalBasesMissed);
 
 			if (isInferQualities) {
-				// fileWriterQualities.write("mean\tsd"
-				// + System.getProperty("line.separator"));
 				for (int i = 0; i < baseQualitiesPerPos.length; i++) {
 					baseQualitiesPerPosMean[i] = (double) baseQualitiesPerPosMean[i]
 							/ baseQualitiesPerPos[i].size();
@@ -489,7 +413,6 @@ public class ErrorProfiling {
 			for (int i = 0; i < maxReadLength; i++) {
 				for (int j = 0; j < 4; j++) {
 					for (int k = 0; k < 4; k++) {
-						// wieso stand vorher total[i][j]???????
 						totalErrorCounts[j][k] += positionConversions[i][j][k];
 						totalBaseCounts[j] += positionConversions[i][j][k];
 						totalCountsPerPos[i] += positionConversions[i][j][k];
@@ -504,7 +427,7 @@ public class ErrorProfiling {
 			for (int i = 0; i < maxReadLength; i++) {
 				for (int j = 0; j < 4; j++) {
 					for (int k = 0; k < 4; k++) {
-						// wieso war das drin??
+						// ???
 						// if (totalCountsPerPosPerBase[i][j] == 0) {
 						// continue;
 						// }
@@ -541,14 +464,14 @@ public class ErrorProfiling {
 				// A-G, A-T, C-A, C-C, ..., T-T)
 
 			}
-			// double[][][] totalErrorCountsPerPosition = new
-			// double[maxReadLength][4][4];
-			// for (int i = 0; i < maxReadLength; i++) {
-			// fileWriterProfile.write("@error rates"
-			// + System.getProperty("line.separator"));
+
 			for (int j = 0; j < 4; j++) {
 				String errorCounts = "";
 				for (int k = 0; k < 4; k++) {
+					fileWriterVCFProfile.write(basePositions[j] + "\t"
+							+ basePositions[k] + "\t" + totalErrorCounts[j][k]);
+					fileWriterVCFProfile.write(System
+							.getProperty("line.separator"));
 					totalErrorCounts[j][k] = (double) totalErrorCounts[j][k]
 							/ totalBaseCounts[j];
 					errorCounts += totalErrorCounts[j][k] + "\t";
@@ -563,6 +486,8 @@ public class ErrorProfiling {
 				}
 				MappingLogger.getLogger().debug(errorCounts);
 				fileWriterProfile.write(System.getProperty("line.separator"));
+				fileWriterVCFProfile
+						.write(System.getProperty("line.separator"));
 			}
 			double averageT2CEPR = 0.0;
 			for (int j = 0; j < mutationsT2C.length; j++) {
@@ -573,7 +498,7 @@ public class ErrorProfiling {
 					break;
 				}
 			}
-			MappingLogger.getLogger().debug(
+			MappingLogger.getLogger().info(
 					"Averaged T2C = " + averageT2CEPR + " EPR");
 			// }
 
@@ -625,18 +550,6 @@ public class ErrorProfiling {
 			fileWriterIndelsMean.write(insertionsOverall + "\t"
 					+ deletionsOverall);
 
-			/*
-			 * Double insertionsRel = (double) insertions / numReadsProcessed;
-			 * Double deletionsRel = (double) deletions / numReadsProcessed;
-			 * fileWriterIndels.write(insertionsRel.toString());
-			 * fileWriterIndels.write(System.getProperty("line.separator"));
-			 * fileWriterIndels.write(deletionsRel.toString());
-			 * fileWriterIndels.write(System.getProperty("line.separator"));
-			 * MappingLogger.getLogger().debug("insertion rate: " +
-			 * insertionsRel); MappingLogger.getLogger().debug("deletion rate: "
-			 * + deletionsRel);
-			 */
-
 			if (isShowErrorPlot) {
 				Plot2DPanel plot = new Plot2DPanel();
 
@@ -661,6 +574,7 @@ public class ErrorProfiling {
 			samFileReader.close();
 			reference.close();
 			fileWriterProfile.close();
+			fileWriterVCFProfile.close();
 			fileWriterIndels.close();
 			fileWriterQualities.close();
 			fileWriterIndelsMean.close();
@@ -707,26 +621,4 @@ public class ErrorProfiling {
 
 		return arrayPosForByte;
 	}
-
-	// private String byteToNucleotide(int arrayPosition) {
-	// String nucleotide = "";
-	//
-	// switch (arrayPosition) {
-	// case 0:
-	// nucleotide = "A";
-	// break;
-	// case 1:
-	// nucleotide = "C";
-	// break;
-	// case 2:
-	// nucleotide = "G";
-	// break;
-	// case 3:
-	// nucleotide = "T";
-	// break;
-	// }
-	//
-	// return nucleotide;
-	// }
-
 }

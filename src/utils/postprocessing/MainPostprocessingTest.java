@@ -1,7 +1,7 @@
 package utils.postprocessing;
 
 import main.MappingLogger;
-import mapping.BowtieMapping;
+import mapping.Bowtie2Mapping;
 
 public class MainPostprocessingTest {
 
@@ -12,7 +12,7 @@ public class MainPostprocessingTest {
 		
 		// genomeMappingFile, transcriptMappingFile, combinedMappingFile
 		test.combine(args[0], args[1], args[2]);
-		BowtieMapping bowtieMapping = new BowtieMapping();
+		Bowtie2Mapping bowtieMapping = new Bowtie2Mapping();
 		bowtieMapping.sortByCoordinateAndIndex(args[2]);
 	}
 

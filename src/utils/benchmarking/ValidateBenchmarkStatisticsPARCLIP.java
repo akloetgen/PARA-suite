@@ -18,54 +18,60 @@ import java.io.Writer;
 
 import main.MappingLogger;
 
+/**
+ * Evaluates the alignment accuracy of a respective read aligner performed on
+ * simulated PAR-CLIP read dataset.
+ * 
+ * @author akloetgen
+ * 
+ */
 public class ValidateBenchmarkStatisticsPARCLIP {
 
-	// public static void main(String[] args) {
-	// MappingLogger.getLogger().info(
-	// "Calculating statistics for mapped "
-	// + "reads against simulated data-set");
-	// String mappingFileName = null;
-	// String outStatistics = null;
-	// String readsFile = null;
-	//
-	// try {
-	// if (args[0].equals("-h") || args[0].equals("--help")) {
-	// MappingLogger
-	// .getLogger()
-	// .error("Usage:\njava -jar evaluate_benchmark.jar "
-	// + "alignmentFileName outputFileStatistics rawReaedsFile");
-	// System.exit(0);
-	// }
-	// mappingFileName = args[0];
-	// outStatistics = args[1];
-	// readsFile = args[2];
-	// } catch (ArrayIndexOutOfBoundsException e) {
-	// MappingLogger
-	// .getLogger()
-	// .error("Usage:\njava -jar evaluate_benchmark.jar "
-	// + "alignmentFileName outputFileStatistics rawReaedsFile");
-	// System.exit(0);
-	// }
+	/**
+	 * Calculates alignment accuracy values, including recall, precision and F1
+	 * score for a given alignment of simulated PAR-CLIP reads
+	 * 
+	 * @param mappingFileName
+	 *            filename of the BAM mapping file
+	 * @param outStatistics
+	 *            filename where the statistics should be written to
+	 * @param readsFile
+	 *            filename of the raw simulated PAR-CLIP reads file
+	 * @param onlyBoundClusters
+	 *            whether only bound PAR-CLIP clusters should be evaluated
+	 */
 	public void calculateBenchmarkStatistics(String mappingFileName,
 			String outStatistics, String readsFile, boolean onlyBoundClusters) {
 
-		// File mappingFile = new File(mappingFileName);
-		// SAMFileReader samFileReader = new SAMFileReader(mappingFile);
 		final SamReaderFactory factory = SamReaderFactory.makeDefault()
 				.enable(SamReaderFactory.Option.INCLUDE_SOURCE_IN_RECORDS)
 				.validationStringency(ValidationStringency.LENIENT);
 		SamReader samFileReader = factory.open(new File(mappingFileName));
 		File outFile = new File(outStatistics);
-		int matched_correctly = 0;
-		int mapped_overall = 0;
-		int mapped_overall_bound = 0;
+		int readsProcessed = 0;
 		int allreads = 0;
-		int allreads_bound = 0;
+
+		// reads marked as bound and correctly aligned?
+		int truePositives = 0;
+		// reads marked as NOT bound and correctly aligned?
+		int trueNegatives = 0;
+		// reads marked as bound and falsely aligned
+		int falsePositives = 0;
+		// reads marked as not bound and falsely aligned
+		int falseNegatives = 0;
+		// reads marked as bound and falsely/not aligned
+		// int falsePositivesTotal = 0;
+		// reads marked as not bound and falsely/not aligned
+		// int falseNegativesTotal = 0;
+		int positives = 0;
+		int negatives = 0;
 
 		String readStartString = "";
 		String readEndString = "";
 		String clusterBound = "";
 		String compl = "";
+
+		boolean startsWithChr = false;
 
 		try {
 
@@ -75,11 +81,18 @@ public class ValidateBenchmarkStatisticsPARCLIP {
 				allreads++;
 				if (line.startsWith("@SEQ_ID")) {
 					String[] splittedHeader = line.split("\\|");
-					// String clusterBound = ;
-					if (splittedHeader[4].split("-")[0].equals("1")) {
-						allreads_bound++;
+					if (splittedHeader[5].split("-")[0].equals("1")) {
+						// allreads_bound++;
+						positives++;
+					} else if (splittedHeader[5].split("-")[0].equals("0")) {
+						negatives++;
 					}
+					// if (splittedHeader[2].startsWith("chr")) {
+					//
+					// }
+
 				}
+
 			}
 			in.close();
 			if (allreads % 4 != 0) {
@@ -89,151 +102,71 @@ public class ValidateBenchmarkStatisticsPARCLIP {
 			}
 			allreads /= 4;
 
-			// int rounds = 10;
-
 			for (SAMRecord readHit : samFileReader) {
-				if (mapped_overall % 100000 == 0) {
+				if (readsProcessed % 100000 == 0) {
 					MappingLogger.getLogger().debug(
-							"mapped_overall: " + mapped_overall);
+							"readsProcessed: " + readsProcessed);
 				}
 				// fastq-header = information about origin in simulated data???
 				// if yes: parse header, compare, output, ready
-				// System.out.println("read-name: " + read.getReadName());
-
-				// chr:start-end
-				// System.out.println("ref-name: " + read.getReferenceName());
-				// System.out.println("alstart-name: " +
-				// read.getAlignmentStart());
-				// System.out.println("alstop-name: " + read.getAlignmentEnd());
 
 				String[] splittedReadName = readHit.getReadName().split("\\|");
 				compl = readHit.getReadName();
-				String readChr = splittedReadName[1];
-				readStartString = splittedReadName[2];
-				readEndString = splittedReadName[3];
+				String readChr = splittedReadName[2];
+				readStartString = splittedReadName[3];
+				readEndString = splittedReadName[4];
+				clusterBound = splittedReadName[5].split("-")[0];
 
-				// following splitting is for ART simulated data
-
-				if (onlyBoundClusters) {
-					clusterBound = splittedReadName[4].split("-")[0];
-					if (clusterBound.equals("1")) {
-						mapped_overall_bound++;
-					}
-				}
-				// FILTER FOR RBP-BOUND CLUSTERS! ONLY THOSE ARE OF INTEREST AND
-				// ARE DENOTED BY A 1 IN THE NEXT TO LAST SPLIT
-				// if (!clusterBound.equals("1")) {
-				// continue;
+				// if (onlyBoundClusters) {
+				// clusterBound = splittedReadName[5].split("-")[0];
+				// if (clusterBound.equals("1")) {
+				// mapped_overall_bound++;
+				// }
 				// }
 
-				// following splitting is for own simulated data
-				// readEndString = splittedReadName[3].split(";")[0];
 				int readStart = Integer.parseInt(readStartString);
 				int readEnd = Integer.parseInt(readEndString);
 
 				String chr = readHit.getReferenceName();
 				if (chr.startsWith("chr")) {
-					chr = chr.substring(3);
+					startsWithChr = true;
+				}
+				if (startsWithChr && !readChr.startsWith("chr")) {
+					readChr = "chr" + readChr;
+				} else if (!startsWithChr && readChr.startsWith("chr")) {
+					readChr = readChr.substring(3);
+				}
+				// System.out.println("ref=" + chr + "; readChr=" + readChr);
+
+				if (readChr.equals("chrM")) {
+					readChr = "chrMT";
 				}
 
 				if (readChr.equals(chr)
 						&& (readStart - 5) <= readHit.getAlignmentStart()
 						&& (readEnd + 5) >= readHit.getAlignmentEnd()
-						&& (!onlyBoundClusters || clusterBound.equals("1"))) {
-
+						&& clusterBound.equals("1")) {
 					// CEHCK THIS AGAIN ON MAPSPLICE; WHETHER READ AND NOT
 					// READHIT SHOULD BE CHECKED AGAIN!=?!==!=!=!?!?!??!?!F
-
-					// output.write("MATCH\n");
-					// if
-					// (readsAlreadyMappedCorrectly.get(readHit.getReadName())
-					// == null) {
-					matched_correctly++;
-					// readsAlreadyMappedCorrectly.put(readHit.getReadName(),
-					// readHit);
-					//
-					// } else {
-					// MappingLogger.getLogger().debug(
-					// "prev: start: "
-					// + readsAlreadyMappedCorrectly.get(
-					// readHit.getReadName())
-					// .getAlignmentStart()
-					// + "; end: "
-					// + readsAlreadyMappedCorrectly.get(
-					// readHit.getReadName())
-					// .getAlignmentEnd()
-					// + "; chr: "
-					// + readsAlreadyMappedCorrectly.get(
-					// readHit.getReadName())
-					// .getReferenceName()
-					// + "; readName: "
-					// + readsAlreadyMappedCorrectly.get(
-					// readHit.getReadName())
-					// .getReadName()
-					// + "; MAPQ: "
-					// + readsAlreadyMappedCorrectly.get(
-					// readHit.getReadName())
-					// .getMappingQuality());
-					//
-					// MappingLogger.getLogger().debug(
-					// "current: start: "
-					// + readHit.getAlignmentStart()
-					// + "; end: " + readHit.getAlignmentEnd()
-					// + "; chr: "
-					// + readHit.getReferenceName()
-					// + "; readName: "
-					// + readHit.getReadName() + "; MAPQ: "
-					// + readHit.getMappingQuality());
-					//
-					// }
-					// } else {
-					// output.write("NOT MATCHED\n");
-					// } else {
-					// MappingLogger.getLogger().debug(
-					// readHit.getReadName() + " : "
-					// + readHit.getReferenceName() + ":"
-					// + readHit.getAlignmentStart() + "-"
-					// + readHit.getAlignmentEnd());
-					// counter++;
-					// } else {
-					// MappingLogger.getLogger().debug(
-					// "wrong: MAPQ: " + readHit.getMappingQuality()
-					// + readHit.getReadName() + "; "
-					// + readHit.getReferenceName() + ": "
-					// + readHit.getAlignmentStart() + "-"
-					// + readHit.getAlignmentEnd());
-					// if (readHit.getReadFailsVendorQualityCheckFlag()) {
-					// MappingLogger.getLogger().debug(
-					// "wrong: " + readHit.getReadName() + "; "
-					// + readHit.getReferenceName() + ": "
-					// + readHit.getAlignmentStart() + "-"
-					// + readHit.getAlignmentEnd());
-					// }
+					truePositives++;
+					// continue;
+				} else if (readChr.equals(chr)
+						&& (readStart - 5) <= readHit.getAlignmentStart()
+						&& (readEnd + 5) >= readHit.getAlignmentEnd()
+						&& clusterBound.equals("0")) {
+					trueNegatives++;
+					// break;
 				}
-				// MappingLogger.getLogger().debug(
-				// "not matched: " + readChr + " vs. " + chr + " and " +
-				// readStart + " vs. "
-				// + readHit.getAlignmentStart() + " and "
-				// + readEnd + " vs. "
-				// + readHit.getAlignmentEnd());
 
-				// if (counter == 20) {
-				// System.exit(0);
-				// }
-
-				// if (readsAlreadyMapped.get(readHit.getReadName()) == null) {
-				mapped_overall++;
-				// TOOOOOOOOOOOOOOOOO
-				// SLOW!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-				// readsAlreadyMapped.put(readHit.getReadName(), readHit);
-				// }
-
-				// if (rounds == 0) {
-				// break;
-				// }
-				// rounds--;
+				readsProcessed++;
 
 			}
+
+			falsePositives = positives - truePositives;
+			falseNegatives = negatives - trueNegatives;
+
+			System.out.println("TP=" + truePositives + "; TN=" + trueNegatives
+					+ "; FP=" + falsePositives + "; FN=" + falseNegatives);
 
 			samFileReader.close();
 			MappingLogger.getLogger().info("Calculating statistics finished.");
@@ -247,7 +180,6 @@ public class ValidateBenchmarkStatisticsPARCLIP {
 					"Abort due to error. Debug Info: start: " + readStartString
 							+ " end: " + readEndString + " compl: " + compl);
 		} catch (SAMFormatException e3) {
-			// e3.printStackTrace();
 			MappingLogger
 					.getLogger()
 					.debug("SAM Format error found. Skipping wrongly formatted read...");
@@ -262,43 +194,49 @@ public class ValidateBenchmarkStatisticsPARCLIP {
 
 			// float precision = (float) matched_correctly / mapped_overall;
 			// float sensitivity = (float) matched_correctly / allreads;
-			float precision;
-			float sensitivity;
-			if (onlyBoundClusters) {
-				precision = (float) matched_correctly / mapped_overall_bound;
-				sensitivity = (float) matched_correctly / allreads_bound;
-			} else {
-				precision = (float) matched_correctly / mapped_overall;
-				sensitivity = (float) matched_correctly / allreads;
-			}
-			float mapped_perc = (float) mapped_overall / allreads;
-			float f1_score = (float) 2 * (precision * sensitivity)
-					/ (precision + sensitivity);
+			// float precision;
+			// float sensitivity;
+
+			float precision = (float) truePositives
+					/ (truePositives + falsePositives);
+			float recall = (float) truePositives
+					/ (truePositives + falseNegatives);
+			float accuracy = (float) (truePositives + trueNegatives)
+					/ (positives + negatives);
+
+			// if (onlyBoundClusters) {
+			// precision = (float) matched_correctly / mapped_overall_bound;
+			// sensitivity = (float) matched_correctly / allreads_bound;
+			// } else {
+			// precision = (float) matched_correctly / mapped_overall;
+			// sensitivity = (float) matched_correctly / allreads;
+			// }
+			// float mapped_perc = (float) mapped_overall / allreads;
+			// float f1_score = (float) 2 * (precision * sensitivity)
+			// / (precision + sensitivity);
+
+			int alignedCorrectly = truePositives + trueNegatives;
+			// float alignedOverall =
 
 			MappingLogger.getLogger().info("Writing statistics to file.");
-			output.write("matched correctly:\t" + matched_correctly
-					+ "\nmapped overall:\t" + mapped_overall + "\nall reads:\t"
-					+ allreads + "\nmapped overall percentage:\t" + mapped_perc
-					+ "\nprecision:\t" + precision + "\nsensitivity:\t"
-					+ sensitivity + "\nf1 score:\t" + f1_score);
+			output.write("matched correctly:\t" + alignedCorrectly
+					+ "\nreadsProcessed:\t" + readsProcessed + "\nall reads:\t"
+					+ allreads + "\nprecision:\t" + precision + "\nrecall:\t"
+					+ recall + "\naccuracy:\t" + accuracy);
 			MappingLogger.getLogger().info(
-					"Precision:\t\t\t" + precision + "\nSensitivity:\t\t\t"
-							+ sensitivity + "\nF1 score:\t\t\t" + f1_score);
+					"Precision:\t\t\t" + precision + "\nRecall:\t\t\t" + recall
+							+ "\nAccuracy:\t\t\t" + accuracy);
 			MappingLogger.getLogger().debug(
-					"matched correctly:\t\t" + matched_correctly
-							+ "\nmapped overall:\t\t\t" + mapped_overall
-							+ "\nall reads:\t\t\t" + allreads
-							+ "\nmapped overall percentage:\t" + mapped_perc
-							+ "\nprecision:\t\t\t" + precision
-							+ "\nsensitivity:\t\t\t" + sensitivity
-							+ "\nf1 score:\t\t\t" + f1_score);
+					"matched correctly:\t" + alignedCorrectly
+							+ "\nreadsProcessed:\t" + readsProcessed
+							+ "\nall reads:\t" + allreads + "\nprecision:\t"
+							+ precision + "\nrecall:\t" + recall
+							+ "\naccuracy:\t" + accuracy);
 
 			output.close();
 		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}

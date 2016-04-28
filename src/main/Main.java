@@ -6,38 +6,38 @@ import java.util.LinkedList;
 import java.util.List;
 
 import mapping.BWAMapping;
+import mapping.Bowtie2Mapping;
 import mapping.BowtieMapping;
 import mapping.Mapping;
 import mapping.MappingErrorException;
-import mapping.PARMAMapping;
+import mapping.PARAsuiteMapping;
 import mapping.UserMapping;
+import utils.benchmarking.ValidateBenchmarkStatisticsClusters;
 import utils.benchmarking.ValidateBenchmarkStatisticsPARCLIP;
 import utils.errorprofile.ErrorProfiling;
+import utils.pileupclusters.FetchSequencesForBindingSites;
 import utils.pileupclusters.PileupClusters;
 import utils.postprocessing.CombineGenomeTranscript;
+import utils.postprocessing.ExtractNotMappedReads;
 import utils.postprocessing.ExtractWeakMappingReads;
 import enums.MappingMode;
-import enums.PARMAPropertiesEnum;
+import enums.PARAsuitePropertiesEnum;
 import enums.ProgramMode;
 
 /**
  * 
- * Main class as entry point for PARMA pipeline. Can execute several sub-utils
- * of the PARMA project.
+ * Main class as entry point for PARA-suite pipeline. Can execute several
+ * sub-utils of the PARA-suite project.
  * 
  * @author akloetgen
  * 
  */
 public class Main {
 
-	private static final String VERSION = "0.5 alpha";
+	private static final String VERSION = "0.6 beta";
 	private static final String AUTHOR = "Andreas Kloetgen";
 
 	public static void main(String[] args) {
-
-		// MappingLogger.getLogger().info(
-		// "Further reading:\t" + "URL" + System.getProperty("line.separator"));
-
 		Help help = new Help();
 		ProgramMode mode = null;
 
@@ -70,6 +70,18 @@ public class Main {
 		case "setup":
 			mode = ProgramMode.SETUP;
 			break;
+		case "extract":
+			mode = ProgramMode.EXTRACT;
+			break;
+		case "extractAligned":
+			mode = ProgramMode.EXTRACTALIGNED;
+			break;
+		case "benchmarkClusters":
+			mode = ProgramMode.BENCHMARK_CLUSTERS;
+			break;
+		case "fetch":
+			mode = ProgramMode.FETCHSEQUENCES;
+			break;
 		default:
 			MappingLogger
 					.getLogger()
@@ -100,10 +112,12 @@ public class Main {
 				int mappingQualityFilterTranscript = 1;
 				String alignmentMode = MappingMode.BWA.toString();
 				String userAlignmentCommand = "";
-				boolean isRefine = true;
+				boolean isRefine = false;
 				boolean isFirstMapping = true;
+				boolean keepUnaligned = false;
 				String additionalOptions = "";
-				String parmaMismatches = "-1";
+				String parasuiteMismatches = "-1";
+				String btMismatches = "1";
 				String bwaMismatches = "2";
 
 				if (args.length == 1) {
@@ -165,20 +179,20 @@ public class Main {
 							MappingLogger
 									.getLogger()
 									.error("Wrong mapping mode set. Please choose "
-											+ "one of the following: bt2, bwa, parma, user");
+											+ "one of the following: bt2, bwa, parasuite, user");
 						}
 						break;
-					case "--parma-mm":
+					case "--parasuite-mm":
 						i++;
-						parmaMismatches = args[i];
+						parasuiteMismatches = args[i];
 						break;
-					case "--parma-ep":
+					case "--parasuite-ep":
 						// COULD BE DELETED AS THIS IS A TK AND NOT A PIPELINE
 						i++;
 						isFirstMapping = false;
 						profileFileName = args[i];
 						break;
-					case "--parma-indel":
+					case "--parasuite-indel":
 						// COULD BE DELETED AS THIS IS A TK AND NOT A PIPELINE
 						i++;
 						indelFileName = args[i];
@@ -186,6 +200,10 @@ public class Main {
 					case "--bwa-mm":
 						i++;
 						bwaMismatches = args[i];
+						break;
+					case "--bt-mm":
+						i++;
+						btMismatches = args[i];
 						break;
 					case "-c":
 						i++;
@@ -197,9 +215,14 @@ public class Main {
 						break;
 					case "--ref-refine":
 						// if the first mapping is not made by BWA, a second
-						// reference file for the bwa parma mod is necessary.
+						// reference file for the bwa parasuite mod is
+						// necessary.
 						i++;
 						referenceRefineFileName = args[i];
+						break;
+					case "--unaligned":
+						// keep unaligned reads in a separate file
+						keepUnaligned = true;
 						break;
 					default:
 						MappingLogger
@@ -222,27 +245,31 @@ public class Main {
 				if (isMapping) {
 					String unalignedGenomicFileName = outputPrefix
 							+ ".unaligned.fastq";
-					String outputPrefixBowtieGenomic = outputPrefix + "."
+					String outputPrefixMapperGenomic = outputPrefix + "."
 							+ alignmentMode + "-genomic";
-					String genomicMappingFileName = outputPrefixBowtieGenomic
+					String genomicMappingFileName = outputPrefixMapperGenomic
 							+ ".bam";
 					String genomicMappingFileNameNew = genomicMappingFileName
 							+ ".new";
 					Mapping mapping = null;
 					ExtractWeakMappingReads extract;
+					extract = new ExtractWeakMappingReads();
 
 					if (alignmentMode.equals(MappingMode.BT2.toString())) {
-						mapping = new BowtieMapping();
+						mapping = new Bowtie2Mapping();
 					} else if (alignmentMode.equals(MappingMode.BWA.toString())) {
 						mapping = new BWAMapping();
 						additionalOptions = bwaMismatches;
-					} else if (alignmentMode.equals(MappingMode.PARMA
+					} else if (alignmentMode.equals(MappingMode.PARAsuite
 							.toString())) {
-						mapping = new PARMAMapping();
-						additionalOptions = parmaMismatches;
+						mapping = new PARAsuiteMapping();
+						additionalOptions = parasuiteMismatches;
 					} else if (alignmentMode
 							.equals(MappingMode.USER.toString())) {
 						mapping = new UserMapping(userAlignmentCommand);
+					} else if (alignmentMode.equals(MappingMode.BT.toString())) {
+						mapping = new BowtieMapping();
+						additionalOptions = btMismatches;
 					} else {
 						MappingLogger.getLogger().error(
 								"Mapping mode not set. Exit.");
@@ -254,7 +281,7 @@ public class Main {
 							tempMappingQualityFilterGenomic = 0;
 						}
 						mapping.executeMapping(threads, referenceFileName,
-								readFileName, outputPrefixBowtieGenomic,
+								readFileName, outputPrefixMapperGenomic,
 								tempMappingQualityFilterGenomic,
 								additionalOptions);
 						if (!isRefine && isTranscriptMapping) {
@@ -264,7 +291,6 @@ public class Main {
 											+ mappingQualityFilterGenomic
 											+ ") from "
 											+ "BAM file and create new FASTQ file");
-							extract = new ExtractWeakMappingReads();
 							extract.extractReads(genomicMappingFileName,
 									genomicMappingFileNameNew,
 									unalignedGenomicFileName,
@@ -282,19 +308,18 @@ public class Main {
 					if (isRefine) {
 						MappingLogger
 								.getLogger()
-								.debug("Reinitialize mapper with PARMA mapping algorithm");
-						mapping = new PARMAMapping();
-						alignmentMode = MappingMode.PARMA.toString();
+								.debug("Reinitialize mapper with PARA-suite mapping algorithm");
+						mapping = new PARAsuiteMapping();
+						alignmentMode = MappingMode.PARAsuite.toString();
 						referenceFileName = referenceRefineFileName;
-						additionalOptions = parmaMismatches;
+						additionalOptions = parasuiteMismatches;
 
 						if (isFirstMapping) {
 							// only if error profile was not given by the user
-							// and a
-							// first alignment was performed
+							// and a first alignment was performed
 							MappingLogger
 									.getLogger()
-									.debug("Calculate error profile from first mapping for PARMA");
+									.debug("Calculate error profile from first mapping for PARA-suite");
 							ErrorProfiling profile = new ErrorProfiling(
 									genomicMappingFileName, referenceFileName,
 									maxReadLength);
@@ -305,27 +330,30 @@ public class Main {
 									+ ".indelprofile";
 						}
 
-						((PARMAMapping) mapping)
+						((PARAsuiteMapping) mapping)
 								.setErrorProfileFilename(profileFileName);
-						((PARMAMapping) mapping)
+						((PARAsuiteMapping) mapping)
 								.setIndelProfileFilename(indelFileName);
 
-						outputPrefixBowtieGenomic = outputPrefix + "."
-								+ "PARMA" + "-genomic";
-						genomicMappingFileName = outputPrefixBowtieGenomic
+						outputPrefixMapperGenomic = outputPrefix + "."
+								+ "PARAsuite" + "-genomic";
+						genomicMappingFileName = outputPrefixMapperGenomic
 								+ ".bam";
+						genomicMappingFileNameNew = genomicMappingFileName
+								+ ".new";
 
 						MappingLogger
 								.getLogger()
-								.debug("Start PARMA algorithm on genomic mapping file "
+								.debug("Start PARA-suite algorithm on genomic mapping file "
 										+ "using error profile calculated in the step before");
 
 						int tempMappingQualityFilterGenomic = 0;
-						if (!isTranscriptMapping) {
+						if (!isTranscriptMapping && !keepUnaligned) {
 							tempMappingQualityFilterGenomic = mappingQualityFilterGenomic;
 						}
+
 						mapping.executeMapping(threads, referenceFileName,
-								readFileName, outputPrefixBowtieGenomic,
+								readFileName, outputPrefixMapperGenomic,
 								tempMappingQualityFilterGenomic,
 								additionalOptions);
 						if (isTranscriptMapping) {
@@ -335,7 +363,7 @@ public class Main {
 											+ mappingQualityFilterGenomic
 											+ ") from "
 											+ "BAM file and create new FASTQ file");
-							extract = new ExtractWeakMappingReads();
+
 							extract.extractReads(genomicMappingFileName,
 									genomicMappingFileNameNew,
 									unalignedGenomicFileName,
@@ -346,7 +374,15 @@ public class Main {
 							mapping.removeFile(genomicMappingFileNameNew);
 						}
 						mapping.sortByCoordinateAndIndex(genomicMappingFileName);
-
+					}
+					if (keepUnaligned) {
+						extract.extractReads(genomicMappingFileName,
+								genomicMappingFileNameNew,
+								unalignedGenomicFileName,
+								mappingQualityFilterGenomic);
+						mapping.renameFile(genomicMappingFileNameNew,
+								genomicMappingFileName);
+						mapping.removeFile(genomicMappingFileNameNew);
 					}
 
 					if (isTranscriptMapping) {
@@ -362,8 +398,9 @@ public class Main {
 								additionalOptions);
 						mapping.sortByNameAndIndex(transcriptMappingFileName);
 
-						mapping.removeFile(unalignedGenomicFileName);
-
+						if (!keepUnaligned) {
+							mapping.removeFile(unalignedGenomicFileName);
+						}
 						// Start postprocessing after transcriptional alignment
 						MappingLogger
 								.getLogger()
@@ -458,6 +495,38 @@ public class Main {
 					outStatistics, readsFile, onlyBoundClusters);
 			MappingLogger.getLogger().debug("Finished.");
 			System.exit(0);
+		} else if (mode.equals(ProgramMode.BENCHMARK_CLUSTERS)) {
+			// ############## BENCHMARK TOOL ##############
+
+			String clustersFileName = null;
+			String outStatistics = null;
+			String clustersReferenceFile = null;
+			boolean onlyBoundClusters = false;
+
+			if (args.length == 1) {
+				help.printBenchmarkToolHelp();
+				System.exit(0);
+			}
+			try {
+				clustersFileName = args[1];
+				outStatistics = args[2];
+				clustersReferenceFile = args[3];
+				if (args.length >= 5 && args[4].equals("--only-bound")) {
+					onlyBoundClusters = true;
+				}
+			} catch (ArrayIndexOutOfBoundsException e) {
+				MappingLogger
+						.getLogger()
+						.error("Wrong number of input files. Please consider the following help:");
+				help.printBenchmarkToolHelp();
+				System.exit(0);
+			}
+			MappingLogger.getLogger().debug("Start benchmarking mapping file");
+			ValidateBenchmarkStatisticsClusters validate = new ValidateBenchmarkStatisticsClusters();
+			validate.calculateBenchmarkStatistics(clustersFileName,
+					outStatistics, clustersReferenceFile);
+			MappingLogger.getLogger().debug("Finished.");
+			System.exit(0);
 		} else if (mode.equals(ProgramMode.ERRORPROFILE)) {
 			// ############## ERRORPROFILE TOOL ##############
 
@@ -478,9 +547,11 @@ public class Main {
 				for (int i = 4; i < args.length; i++) {
 					switch (args[i]) {
 					case "-q":
+						i++;
 						isQualityCalc = Boolean.parseBoolean(args[i]);
 						break;
 					case "-p":
+						i++;
 						showErrorPlot = Boolean.parseBoolean(args[i]);
 						break;
 					default:
@@ -505,7 +576,7 @@ public class Main {
 					referenceFileName, maxReadLength);
 			profiling.inferErrorProfile(isQualityCalc, showErrorPlot);
 			MappingLogger.getLogger().debug("Finished.");
-			System.exit(0);
+			// System.exit(0);
 		} else if (mode.equals(ProgramMode.CLUSTERING)) {
 			// ############## CLUSTERING TOOL ##############
 
@@ -553,17 +624,22 @@ public class Main {
 			}
 			for (int i = 1; i < args.length; i++) {
 				switch (args[i]) {
-				case "--parma":
-					PARMAProperties.setProperty(
-							PARMAPropertiesEnum.PARMA_LOCATION, args[i + 1]);
+				case "--parasuite":
+					PARAsuiteProperties.setProperty(
+							PARAsuitePropertiesEnum.PARAsuite_LOCATION,
+							args[i + 1]);
 					break;
 				case "--bwa":
-					PARMAProperties.setProperty(
-							PARMAPropertiesEnum.BWA_LOCATION, args[i + 1]);
+					PARAsuiteProperties.setProperty(
+							PARAsuitePropertiesEnum.BWA_LOCATION, args[i + 1]);
 					break;
 				case "--bt2":
-					PARMAProperties.setProperty(
-							PARMAPropertiesEnum.BT2_LOCATION, args[i + 1]);
+					PARAsuiteProperties.setProperty(
+							PARAsuitePropertiesEnum.BT2_LOCATION, args[i + 1]);
+					break;
+				case "--bowtie":
+					PARAsuiteProperties.setProperty(
+							PARAsuitePropertiesEnum.BT_LOCATION, args[i + 1]);
 					break;
 				default:
 					break;
@@ -658,6 +734,97 @@ public class Main {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
+		} else if (mode.equals(ProgramMode.EXTRACT)) {
+			// ############## EXTRACTING WEAK MAPPINGS FROM BAM ##############
+			int mapqThreshold = 10;
+			if (args.length == 1) {
+				help.printExtractHelp(mapqThreshold);
+				System.exit(0);
+			}
+			String inputBAMFile = null;
+			String outputFastqFile = null;
+			String tempBAMFile = "tempfile.bam";
+
+			for (int i = 1; i < args.length; i++) {
+				switch (args[i]) {
+				case "-i":
+					inputBAMFile = args[i + 1];
+					break;
+				case "-o":
+					outputFastqFile = args[i + 1];
+					break;
+				case "-t":
+					mapqThreshold = Integer.parseInt(args[i + 1]);
+					break;
+				default:
+					break;
+				}
+			}
+			if (inputBAMFile == null || outputFastqFile == null) {
+				help.printExtractHelp(mapqThreshold);
+				System.exit(0);
+			}
+
+			ExtractWeakMappingReads extract = new ExtractWeakMappingReads();
+			extract.extractReads(inputBAMFile, tempBAMFile, outputFastqFile,
+					mapqThreshold);
+			Mapping mapping = new BWAMapping();
+			// rename and remove temporary mapping file; is now
+			// filtered!!!
+			mapping.renameFile(tempBAMFile, inputBAMFile);
+			mapping.removeFile(tempBAMFile);
+
+		} else if (mode.equals(ProgramMode.EXTRACTALIGNED)) {
+			// ####### EXTRACTING ALL ALIGNED READ NAMES FROM BAM #######
+			String inputBAMFile = null;
+			String outputReads = null;
+			for (int i = 1; i < args.length; i++) {
+				switch (args[i]) {
+				case "-a":
+					inputBAMFile = args[i + 1];
+					break;
+				case "-o":
+					outputReads = args[i + 1];
+					break;
+				}
+			}
+			if (inputBAMFile == null || outputReads == null) {
+				// help.printExtractHelp(mapqThreshold);
+				MappingLogger.getLogger().error("error message missing!!!");
+				System.exit(0);
+			}
+
+			ExtractNotMappedReads extract = new ExtractNotMappedReads();
+			extract.extractReads(inputBAMFile, outputReads);
+
+		} else if (mode.equals(ProgramMode.FETCHSEQUENCES)) {
+			// ####### EXTRACTING ALL ALIGNED READ NAMES FROM BAM #######
+			String inputBindingSites = null;
+			String referenceFile = null;
+			String outputFile = null;
+			for (int i = 1; i < args.length; i++) {
+				switch (args[i]) {
+				case "-i":
+					inputBindingSites = args[i + 1];
+					break;
+				case "-r":
+					referenceFile = args[i + 1];
+					break;
+				case "-o":
+					outputFile = args[i + 1];
+					break;
+				}
+			}
+			if (inputBindingSites == null || referenceFile == null
+					|| outputFile == null) {
+				// help.printExtractHelp(mapqThreshold);
+				MappingLogger.getLogger().error("-i inputBindingSites; -r reference; -o outputFile");
+				System.exit(0);
+			}
+
+			FetchSequencesForBindingSites fetch = new FetchSequencesForBindingSites();
+			fetch.fetchSequences(referenceFile, inputBindingSites, outputFile);
+
 		}
 
 	}

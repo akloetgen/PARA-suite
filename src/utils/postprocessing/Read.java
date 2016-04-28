@@ -5,6 +5,14 @@ import htsjdk.samtools.SAMRecord;
 import java.util.LinkedList;
 import java.util.List;
 
+/**
+ * Container for a single sequencing read. Saves additional information
+ * necessary for calculating the mapping position in the reference genome for
+ * reads aligned against a transcriptome sequence.
+ * 
+ * @author akloetgen
+ * 
+ */
 public class Read {
 
 	private String readName;

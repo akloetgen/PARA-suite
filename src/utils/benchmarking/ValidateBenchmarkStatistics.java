@@ -18,6 +18,11 @@ import java.io.Writer;
 
 import main.MappingLogger;
 
+/**
+ * 
+ * @author akloetgen
+ * @deprecated
+ */
 public class ValidateBenchmarkStatistics {
 
 	public static void main(String[] args) {

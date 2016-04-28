@@ -11,36 +11,36 @@ import enums.PARAsuitePropertiesEnum;
 import enums.StreamRedirect;
 
 /**
- * Read alignment using Bowtie.
+ * Read alignment using Bowtie2.
  * 
  * @author akloetgen
  * 
  */
-public class BowtieMapping extends Mapping {
+public class Bowtie2Mapping extends Mapping {
+
 	public void executeMapping(int threads, String reference, String input,
 			String outputPrefix, int mappingQualityFilter,
 			String additionalOptions) throws MappingErrorException {
 		try {
 			List<String> bowtieCommandList = new LinkedList<String>();
-			String btLocation = PARAsuiteProperties
-					.getProperty(PARAsuitePropertiesEnum.BT_LOCATION);
-			if (btLocation == null) {
-				btLocation = "";
-			} else if (!btLocation.endsWith("/")) {
-				btLocation += "/";
+			String bt2Location = PARAsuiteProperties
+					.getProperty(PARAsuitePropertiesEnum.BT2_LOCATION);
+			if (bt2Location == null) {
+				bt2Location = "";
+			} else if (!bt2Location.endsWith("/")) {
+				bt2Location += "/";
 			}
 
 			// check whether BWA index exists for reference file, else calculate
-			// it
-			File indexFile = new File(reference + ".1.ebwt");
+			// it with the PARMA-extension of BWA
+			File indexFile = new File(reference + ".bwt");
 			if (!indexFile.exists()) {
 				// create index
-				bowtieCommandList.add(btLocation + "bowtie-build");
+				bowtieCommandList.add(bt2Location + "bowtie2-build");
 				bowtieCommandList.add(reference);
 				bowtieCommandList.add(reference);
-				MappingLogger
-						.getLogger()
-						.info("Creating Bowtie-index for reference file using Bowtie");
+				MappingLogger.getLogger().info(
+						"Creating BWA-index for reference file using Bowtie2");
 				if (executeCommand(bowtieCommandList, StreamRedirect.ERROR) != 0) {
 					MappingErrorException e = new MappingErrorException();
 					e.setMappingCommand(bowtieCommandList);
@@ -51,20 +51,12 @@ public class BowtieMapping extends Mapping {
 
 			setTimeStart();
 			MappingLogger.getLogger().info(
-					"Starting Bowtie mapping to investigate error-profile");
+					"Starting Bowtie2 mapping to investigate error-profile");
 
-			bowtieCommandList.add(btLocation + "bowtie");
-			// -v for additional options? is mismatch counter...
-			bowtieCommandList.add("-S");
-			bowtieCommandList.add("-p");
-			bowtieCommandList.add(threads + "");
-			bowtieCommandList.add("-v");
-			bowtieCommandList.add(additionalOptions);
-			bowtieCommandList.add("--best");
-			bowtieCommandList.add(reference);
-			bowtieCommandList.add("-q");
-			bowtieCommandList.add(input);
-			bowtieCommandList.add(outputPrefix + ".sam");
+			bowtieCommandList.add(bt2Location + "bowtie2");
+			bowtieCommandList.add("-p " + threads + " -x " + reference + " -U "
+					+ input + " -S " + outputPrefix + ".sam"
+					+ additionalOptions);
 			if (executeCommand(bowtieCommandList, StreamRedirect.ALL) != 0) {
 				MappingErrorException e = new MappingErrorException();
 				e.setMappingCommand(bowtieCommandList);
@@ -72,15 +64,15 @@ public class BowtieMapping extends Mapping {
 			}
 
 			MappingLogger.getLogger().debug(
-					"Time passed for Bowtie algorithm: "
+					"Time passed for Bowtie2 algorithm: "
 							+ calculatePassedTime()
-							+ " seconds elapsed for Bowtie alignment");
+							+ " seconds elapsed for Bowtie2 alignment");
 
 			MappingLogger
 					.getLogger()
 					.info("Convert SAM-file of Bowtie2 mapped reads to BAM-file, filter, sort, index, remove temp files");
 			MappingLogger.getLogger().debug(
-					"Convert SAM-file of Bowtie mapped reads to BAM-file");
+					"Convert SAM-file of Bowtie2 mapped reads to BAM-file");
 			List<String> cleanUpCommandsList = new LinkedList<String>();
 			cleanUpCommandsList.add("samtools");
 			cleanUpCommandsList.add("view");

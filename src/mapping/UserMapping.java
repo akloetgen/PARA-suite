@@ -47,7 +47,6 @@ public class UserMapping extends Mapping {
 				userAlignerCommandsList.add(userAlignerCommands[i]);
 			}
 
-			// MappingLogger.getLogger().debug(bowtie2Command);
 			if (executeCommand(userAlignerCommandsList, StreamRedirect.ALL) != 0) {
 				MappingErrorException e = new MappingErrorException();
 				e.setMappingCommand(userAlignerCommandsList);
@@ -98,10 +97,6 @@ public class UserMapping extends Mapping {
 			cleanUpCommandsList.add(outputPrefix + ".unique.bam");
 			cleanUpCommandsList.add(outputPrefix + ".bam");
 			executeCommand(cleanUpCommandsList, StreamRedirect.ALL);
-
-			// sort and index
-			// sortByCoordinateAndIndex(outputPrefixBowtie + ".bam");
-
 		} catch (IOException e) {
 			MappingLogger.getLogger().error(
 					"IO exception thrown in FirstMapping with "

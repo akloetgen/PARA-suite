@@ -17,26 +17,33 @@ import java.io.Writer;
 
 /**
  * 
- * 
+ * Extracts sequencing reads from a BAM file which have a low mapping quality
+ * and save those into another file.
  * 
  * @author akloetgen
  * 
  */
 public class ExtractWeakMappingReads {
 
-	public ExtractWeakMappingReads() {
-
-	}
-
+	/**
+	 * Extracts unaligned reads from a BAM and saves them to a FASTQ file
+	 * 
+	 * @param mappingFileName
+	 *            mapping file containing unaligned sequencing reads
+	 * @param mappingFileNameNew
+	 *            file name for BAM file not containing the unaligned reads
+	 * @param unalignedReadFileName
+	 *            file name for the FASTQ file containing only unaligned reads
+	 * @param mapqThreshold
+	 *            mapping quality which is the threshold for "unaligned" reads
+	 */
 	public void extractReads(String mappingFileName, String mappingFileNameNew,
 			String unalignedReadFileName, int mapqThreshold) {
-		// File mappingFile = new File(mappingFileName);
 		final SamReaderFactory factory = SamReaderFactory.makeDefault()
 				.enable(SamReaderFactory.Option.INCLUDE_SOURCE_IN_RECORDS)
 				.validationStringency(ValidationStringency.LENIENT);
 		SamReader mappingFileReader = factory.open(new File(mappingFileName));
 
-		// SAMFileReader mappingFileReader = new SAMFileReader(mappingFile);
 		File unalignedReadFile = new File(unalignedReadFileName);
 		SAMFileWriterFactory fac = new SAMFileWriterFactory();
 		SAMFileWriter mappingFileNew = fac.makeBAMWriter(mappingFileReader
@@ -80,10 +87,8 @@ public class ExtractWeakMappingReads {
 			unalignedReadOutput.close();
 			mappingFileReader.close();
 		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}

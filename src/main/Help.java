@@ -36,17 +36,18 @@ public class Help {
 	}
 
 	public void printProgramInfo(ProgramMode mode, String version, String author) {
-		System.out.println("Program:\tPARMA toolkit - " + mode.toString());
+		System.out.println("Program:\tPARA-suite - " + mode.toString());
 		System.out.println("Version:\t" + version);
 		System.out.println("Author:\t\t" + author
 				+ System.getProperty("line.separator"));
 	}
 
 	public void printProgramModeHelp() {
-		System.out.println("Usage: java -jar parma.jar <PROGRAMMODE> [options]"
-				+ System.getProperty("line.separator"));
 		System.out
-				.println("Following programmodes are available through the PARMA toolkit:");
+				.println("Usage: java -jar parasuite.jar <PROGRAMMODE> [options]"
+						+ System.getProperty("line.separator"));
+		System.out
+				.println("Following programmodes are available through the PARA-suite:");
 		System.out
 				.println("\tmap\t\tstarts the read mapping of a read set against a reference sequence");
 		System.out
@@ -60,11 +61,15 @@ public class Help {
 		System.out
 				.println("\tbenchmark\tcalculates mapping statsistics of a mapping against a simulated PAR-CLIP dataset");
 		System.out
-				.println("\tsetup\t\tenables to set some PARMA-tk specific parameters");
+				.println("\tbenchmarkClusters\tcalculates cluster statsistics of detected binding sites from a simulated PAR-CLIP dataset");
+		System.out
+				.println("\tsetup\t\tenables to set some PARA-suite specific parameters");
+		System.out
+				.println("\textract\t\textracts weakly aligned/unaligned reads from a BAM file");
 	}
 
 	public void printMappingToolHelp() {
-		System.out.println("Usage: java -jar parma.jar map [options]"
+		System.out.println("Usage: java -jar parasuite.jar map [options]"
 				+ System.getProperty("line.separator"));
 		System.out.println("Following options are available");
 		System.out.println("\t-q FILE*\tread file in FASTQ-format");
@@ -81,22 +86,25 @@ public class Help {
 		System.out
 				.println("\t--tm INT\tmapping quality filter for transcriptomic mapping [default: 1]");
 		System.out
-				.println("\t--refine\tuses error-profile derived from selected mapping vs. genome to apply PARMA with the calculated error-profile");
+				.println("\t--refine\tuses error-profile derived from selected mapping vs. genome to apply PARA-suite with the calculated error-profile");
 		System.out
-				.println("\t--ref-refine FILE\tReference file for PARMA algorithm, if --refine option was activated [default: same as -r file]");
+				.println("\t--ref-refine FILE\tReference file for PARA-suite algorithm, if --refine option was activated [default: same as -r file]");
 		System.out
-				.println("\t--mode\t\tdefines mapping algorithm used: BT2, BWA, PARMA, USER [default: BWA]");
+				.println("\t--unaligned\textracts unaligned reads after MAPQ filtering into a separate file");
 		System.out
-				.println("\t--parma-mm	ONLY IF \"--mode parma\": number of average mismatches while applying PARMA algorithm [default: 2]");
+				.println("\t--mode\t\tdefines mapping algorithm used: BT2, BWA, PARAsuite, USER [default: BWA]");
 		System.out
-				.println("\t--parma-ep	ONLY IF \"--mode parma\": filename of the error profile file");
+				.println("\t--parauiste-mm	ONLY IF \"--mode parasuite\": number of average mismatches while applying PARA-suite algorithm [default: 2]");
 		System.out
-				.println("\t--parma-indel	ONLY IF \"--mode parma\": filename of the error profile file");
+				.println("\t--parauiste-ep	ONLY IF \"--mode parasuite\": filename of the error profile file");
+		System.out
+				.println("\t--parauiste-indel	ONLY IF \"--mode parasuite\": filename of the error profile file");
 		System.out
 				.println("\t-c COMMAND\tsets the user aligner command in \"\". Use INPUT, REFERENCE, OUTPUT and THREADS as place holders."
 						+ " The TK will exchange those place holders with the respective options.");
-		MappingLogger.getLogger().debug(
-				"SOME VALUES ARE STILL MISSING IN THIS HELP!!!!");
+		System.out.println("\t-o FILE\t\tfilename for the logging file.");
+		System.out
+				.println("\t--unaligned\t\tkeeps unaligned/weakly aligned reads in the BAM file");
 		System.out.println();
 		System.out.println("Options marked with a * are requiered.");
 
@@ -104,23 +112,29 @@ public class Help {
 
 	public void printCombineToolHelp() {
 		System.out
-				.println("Usage: java -jar parma.jar comb GENOMIC_MAPPING_FILE TRANSCRIPTOMIC_MAPPING_FILE OUTPUT_FILE");
+				.println("Usage: java -jar parasuite.jar comb GENOMIC_MAPPING_FILE TRANSCRIPTOMIC_MAPPING_FILE OUTPUT_FILE");
 	}
 
 	public void printBenchmarkToolHelp() {
 		System.out
-				.println("Usage: java -jar parma.jar benchmark MAPPING_FILE OUT_STATISTICS_FILE READS_FILE");
+				.println("Usage: java -jar parasuite.jar benchmark MAPPING_FILE OUT_STATISTICS_FILE READS_FILE");
+	}
+
+	public void printBenchmarkClustersToolHelp() {
+		System.out.println("Usage: java -jar parasuite.jar benchmarkClusters "
+				+ "CLUSTERS_FILE OUT_STATISTICS_FILE CLUSTER_REFERENCE_FILE");
+
 	}
 
 	public void printClusterToolHelp() {
 		System.out
-				.println("Usage: java -jar parma.jar clust MAPPING_FILE REFERENCE_FILE OUTPUT_FILE SNP_FILE MIN_COVERAGE");
+				.println("Usage: java -jar parasuite.jar clust MAPPING_FILE REFERENCE_FILE OUTPUT_FILE SNP_FILE MIN_COVERAGE");
 	}
 
 	public void printErrorprofileToolHelp(boolean isQualityCalc,
 			boolean showErrorPlot) {
 		System.out
-				.println("Usage: java -jar parma.jar error MAPPING_FILE REFERENCE_FILE MAX_READ_LENGTH [options]"
+				.println("Usage: java -jar parasuite.jar error MAPPING_FILE REFERENCE_FILE MAX_READ_LENGTH [options]"
 						+ System.getProperty("line.separator"));
 		System.out.println("Additional options are:");
 		System.out
@@ -140,15 +154,15 @@ public class Help {
 		System.out
 				.println("NOT AVAILABLE IN THE CURRENT VERSION! PLEASE MANUALLY SET THE PATHS TO THE ALIGNERS!!");
 		System.out
-				.println("Usage: java -jar parma.jar setup --ALIGNER PATH_TO_ALIGNER"
+				.println("Usage: java -jar parasuite.jar setup --ALIGNER PATH_TO_ALIGNER"
 						+ System.getProperty("line.separator"));
 		System.out
-				.println("Currently supported options for aligners are: parma, bwa, bowtie2");
+				.println("Currently supported options for aligners are: parasuite, bwa, bowtie2");
 	}
 
 	public void printSimulateHelp() {
 		System.out
-				.println("Usage: java -jar parma.jar simulate TRANSCRIPT_FILE OUTPUT_PREFIX ERROR_PROFILE T2C_PROFILE T2C_POSITIONS_PROFILE QUALITY_DIST INDEL_PROFILE RBP_BOUND [options]"
+				.println("Usage: java -jar parasuite.jar simulate TRANSCRIPT_FILE OUTPUT_PREFIX ERROR_PROFILE T2C_PROFILE T2C_POSITIONS_PROFILE QUALITY_DIST INDEL_PROFILE RBP_BOUND [options]"
 						+ System.getProperty("line.separator"));
 		System.out
 				.println("\tTRANSCRIPT_FILE\t\tfasta file containing transcript sequences on which PAR-CLIP reads are simulated");
@@ -170,5 +184,16 @@ public class Help {
 		System.out.println("Additional options are:");
 		System.out
 				.println("\t-I\tpath to cpan Math::Random library. Necessary, if perl does not find the library.");
+	}
+
+	public void printExtractHelp(int mapqThreshold) {
+		System.out.println("Usage: java -jar parasuite.jar extract [options]"
+				+ System.getProperty("line.separator"));
+		System.out.println("\t-i FILE\t\tBAM file containing read alignments");
+		System.out
+				.println("\t-o FILE\t\tFASTQ filename where weak mappings are saved to");
+		System.out
+				.println("\t-t INT\t\tMAPQ used as threshold to extract weak read alignments ["
+						+ mapqThreshold + "]");
 	}
 }
