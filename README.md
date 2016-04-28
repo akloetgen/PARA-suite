@@ -1,14 +1,14 @@
-# PARMA toolkit
-PAR-CLIP Read MApper toolkit. Useful tools for short and error prone sequence read handling. Note, that the PARMA addon of the Burrows-Wheeler Aligner (BWA) is necessary for the mapping tool of the PARMA-tk.
+# PARA-suite toolkit
+PAR-CLIP Analyzing suite. Useful tools for short and error prone sequence read handling. Note, that the PARA-suite addon of the Burrows-Wheeler Aligner (BWA) is necessary for the mapping tool of the PARA-suite.
 
 For more information on the usage please see "Manual.pdf".
 
 ## Installation
 	git clone https://github.com/akloetgen/PARMA_tk.git
 	cd PARMA_tk/bin/
-	java -jar parma.jar setup --parma $myPATH_TO_PARMA
+	java -jar parasuite.jar setup --parasuite $myPATH_TO_PARMA
 
-The 3rd installation step sets the path to the binary-folder of the PARMA algorithm to make it accessible for the PARMA toolkit. Therefore, make sure the PARMA algorithm (https://github.com/akloetgen/PARMA) is installed correctly.
+The 3rd installation step sets the path to the binary-folder of the PARA-suite alignment algorithm to make it accessible for the PARA-suite toolkit. Therefore, make sure the PARA-suite alignment algorithm (https://github.com/akloetgen/PARA-suite_aligner) is installed correctly.
 
 ### Requirements
 - Java (7 or 8 should work)
@@ -17,7 +17,7 @@ The 3rd installation step sets the path to the binary-folder of the PARMA algori
 - Perl CPAN Math::Random package (http://search.cpan.org/~grommel/Math-Random-0.71/)
 
 ### Getting help
-	java -jar parma.jar --help
+	java -jar parasuite.jar --help
 
 ## Testdata
 	chmod u+x examples.sh examples_remove_temp.sh
