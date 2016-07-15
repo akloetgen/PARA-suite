@@ -4,7 +4,7 @@
 myPathToMathRandom=/etc/perl/
 
 # executing the PAR-CLIP read simulator script using the example files in /../examples/simulation/
-java -jar parma.jar simulate ../examples/simulation/reference_chr1_transcripts.fa ../examples/simulation/testout_simulation ../examples/simulation/example.errorprofile ../examples/simulation/example.sitefrequency ../examples/simulation/example.sitepositions ../examples/simulation/example.qualities ../examples/simulation/example.indels 0.6 -I $myPathToMathRandom
+java -jar parasuite.jar simulate ../examples/references/reference_chr1_transcripts.fa ../examples/simulation/testout_simulation ../examples/simulation/example.errorprofile ../examples/simulation/example.sitefrequency ../examples/simulation/example.sitepositions ../examples/simulation/example.qualities ../examples/simulation/example.indels 0.6 -I $myPathToMathRandom
 
 # run PARMA pipeline on simulated PAR-CLIP reads
 samtools faidx ../examples/references/reference_chr1.fa
@@ -14,16 +14,16 @@ ln -s reference_chr1.fa.fai ../examples/references/reference_chr1_parma.fa.fai
 ln -s reference_chr1.fa ../examples/references/reference_chr1_bwa.fa
 ln -s reference_chr1.fa ../examples/references/reference_chr1_parma.fa
 
-java -jar parma.jar map -q ../examples/simulation/testout_simulation.fastq -r ../examples/references/reference_chr1_bwa.fa -t ../examples/references/reference_chr1_transcripts.fa -o ../examples/mapping/testout_simulation_mapped --refine --ref-refine ../examples/references/reference_chr1_parma.fa
+java -jar parasuite.jar map -q ../examples/simulation/testout_simulation.fastq -r ../examples/references/reference_chr1_bwa.fa -t ../examples/references/reference_chr1_transcripts.fa -o ../examples/mapping/testout_simulation_mapped --refine --ref-refine ../examples/references/reference_chr1_parma.fa
 
 # benchmark PARMA alignment on simulated PAR-CLIP reads
-java -jar parma.jar benchmark ../examples/mapping/testout_simulation_mapped.combined.bam ../examples/mapping/testout_simulation_mapped.combined.stats ../examples/simulation/testout_simulation.fastq
+java -jar parasuite.jar benchmark ../examples/mapping/testout_simulation_mapped.combined.bam ../examples/mapping/testout_simulation_mapped.combined.stats ../examples/simulation/testout_simulation.fastq
 
 # calculate error profile
-java -jar parma.jar error ../examples/mapping/testout_simulation_mapped.combined.bam ../examples/references/reference_chr1.fa 51 -q
+java -jar parasuite.jar error ../examples/mapping/testout_simulation_mapped.combined.bam ../examples/references/reference_chr1.fa 51 -q
 
 # combine genomic and transcriptomic mapping
-java -jar parma.jar comb ../examples/mapping/testout_simulation_mapped.PARMA-genomic.bam ../examples/mapping/testout_simulation_mapped.PARMA-transcript.bam ../examples/mapping/testout_simulation_mapped.PARMA.combined.bam
+java -jar parasuite.jar comb ../examples/mapping/testout_simulation_mapped.PARMA-genomic.bam ../examples/mapping/testout_simulation_mapped.PARMA-transcript.bam ../examples/mapping/testout_simulation_mapped.PARMA.combined.bam
 
 # clustering aligned PAR-CLIP reads to obtain RBP-bound regions
-java -jar parma.jar clust ../examples/mapping/testout_simulation_mapped.combined.bam ../examples/references/reference_chr1.fa ../examples/mapping/testout_simulation_mapped.combined.clusters ../examples/references/snp_db.vcf.gz 1
+java -jar parasuite.jar clust ../examples/mapping/testout_simulation_mapped.combined.bam ../examples/references/reference_chr1.fa ../examples/mapping/testout_simulation_mapped.combined.clusters ../examples/references/snp_db.vcf.gz 1
