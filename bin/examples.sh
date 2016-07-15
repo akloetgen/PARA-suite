@@ -27,7 +27,7 @@ java -jar parasuite.jar map -q ../examples/simulation/testout_simulation.fastq -
 java -jar parasuite.jar benchmark ../examples/mapping/testout_simulation_mapped.combined.bam ../examples/mapping/testout_simulation_mapped.combined.stats ../examples/simulation/testout_simulation.fastq
 
 # calculate error profile
-java -jar parasuite.jar error ../examples/mapping/testout_simulation_mapped.combined.bam ../examples/references/reference_chr1.fa 51 -q
+java -jar parasuite.jar error ../examples/mapping/testout_simulation_mapped.combined.bam ../examples/references/reference_chr1.fa 51
 
 # combine genomic and transcriptomic mapping
 java -jar parasuite.jar comb ../examples/mapping/testout_simulation_mapped.PARAsuite-genomic.bam ../examples/mapping/testout_simulation_mapped.PARAsuite-transcript.bam ../examples/mapping/testout_simulation_mapped.PARAsuite.combined.bam
