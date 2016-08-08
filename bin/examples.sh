@@ -3,14 +3,16 @@
 # if you have installed the CPAN Math::Random library somewhere else, please specify the location here
 myPathToMathRandom=/etc/perl/
 
-# executing the PAR-CLIP read simulator script using the example files in /../examples/simulation/
-java -jar parasuite.jar simulate ../examples/references/reference_chr1_transcripts.fa ../examples/simulation/testout_simulation ../examples/simulation/example.errorprofile ../examples/simulation/example.sitefrequency ../examples/simulation/example.sitepositions ../examples/simulation/example.qualities ../examples/simulation/example.indels 0.6 -I $myPathToMathRandom
+touch ../examples/simulation/testout_simulation.fastq
 
-if ![[ -s ../examples/simulation/testout_simulation.fastq ]] ; then
-	echo "../examples/simulation/testout_simulation.fastq is empty."
-	echo "please run examples_remove_temp.sh and re-run examples.sh"
-	echo "this error can be caused when no read was created due to the random nature of the simulation"
-	exit
+while ![[ -s ../examples/simulation/testout_simulation.fastq ]] ; then
+	# executing the PAR-CLIP read simulator script using the example files in /../examples/simulation/
+	java -jar parasuite.jar simulate ../examples/references/reference_chr1_transcripts.fa ../examples/simulation/testout_simulation ../examples/simulation/example.errorprofile ../examples/simulation/example.sitefrequency ../examples/simulation/example.sitepositions ../examples/simulation/example.qualities ../examples/simulation/example.indels 0.6 -I $myPathToMathRandom
+	
+	#echo "../examples/simulation/testout_simulation.fastq is empty."
+	#echo "please run examples_remove_temp.sh and re-run examples.sh"
+	#echo "this error can be caused when no read was created due to the random nature of the simulation"
+	#exit
 fi ;
 
 # run PARAsuite pipeline on simulated PAR-CLIP reads
