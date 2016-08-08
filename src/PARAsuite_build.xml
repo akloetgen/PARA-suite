@@ -1,21 +1,15 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <project default="create_run_jar" name="Create Runnable Jar for the PARA-suite">
-    <!--this file was created by Eclipse Runnable JAR Export Wizard-->
     <!--ANT 1.7 is required                                        -->
     <target name="create_run_jar">
-        <jar destfile="bin/parasuite.jar">
-            <manifest>
-                <attribute name="Main-Class" value="org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader"/>
-                <attribute name="Rsrc-Main-Class" value="main.Main"/>
-                <attribute name="Class-Path" value="."/>
-                <attribute name="Rsrc-Class-Path" value="./ jmathplot.jar log4j-1.2.17.jar bzip2.jar htsjdk-1.128.jar"/>
-            </manifest>
-            <zipfileset src="jar-in-jar-loader.zip"/>
-            <fileset dir="bin"/>
-            <zipfileset dir="lib/" includes="jmathplot.jar"/>
-            <zipfileset dir="lib/" includes="log4j-1.2.17.jar"/>
-            <zipfileset dir="lib/" includes="bzip2.jar"/>
-            <zipfileset dir="lib/" includes="htsjdk-1.128.jar"/>
+        <jar destfile="../bin/parasuite.jar">
+			<fileset dir="bin"/>
+			<include name="bin/**/*.class"/>
+			 <manifest>
+				 <attribute name="Main-Class" value="main.Main"/>
+				 <attribute name="Class-Path" value="../lib/jmathplot.jar ../lib/log4j-1.2.17.jar ../lib/bzip2.jar ../lib/htsjdk-1.128.jar"/>
+			 </manifest>
+			 
         </jar>
     </target>
 </project>
