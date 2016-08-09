@@ -10,6 +10,13 @@ For more information on the usage please see "Manual.pdf".
 
 The 3rd installation step sets the path to the binary-folder of the PARA-suite alignment algorithm to make it accessible for the PARA-suite toolkit. Therefore, make sure the PARA-suite alignment algorithm (https://github.com/akloetgen/PARA-suite_aligner) is installed correctly.
 
+## Build instructions
+	git clone https://github.com/akloetgen/PARA-suite.git
+	cd PARA-suite/src/
+	ant -buildfile PARAsuite_build.xml
+	cd ../bin/
+	java -jar parasuite.jar setup --parasuite $myPATH_TO_PARASUITE
+
 ### Requirements
 - Java (7 or 8 should work)
 - Perl 5
