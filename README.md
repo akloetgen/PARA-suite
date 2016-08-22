@@ -25,6 +25,7 @@ The 3rd installation step sets the path to the binary-folder of the PARA-suite a
 
 ### Getting help
 	java -jar parasuite.jar --help
+If the alignment aborts with an unspecified error, please forward us the alignment log-file (should be named $your_output.log).
 
 ## Testdata
 	chmod u+x examples.sh examples_remove_temp.sh
