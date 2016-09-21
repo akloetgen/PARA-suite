@@ -20,7 +20,7 @@ The 3rd installation step sets the path to the binary-folder of the PARA-suite a
 ### Requirements
 - Java (7 or 8 should work)
 - Perl 5
-- samtools (Version 1.0 or newer: https://github.com/samtools/samtools) 
+- samtools (Version 1.3 or newer: https://github.com/samtools/samtools) 
 - Perl CPAN Math::Random package (http://search.cpan.org/~grommel/Math-Random-0.71/)
 
 ### Getting help
