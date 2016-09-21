@@ -1,6 +1,5 @@
 package mapping;
 
-import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -23,95 +22,76 @@ public class UserMapping extends Mapping {
 
 	public void executeMapping(int threads, String reference, String input,
 			String outputPrefix, int mappingQualityFilter,
-			String additionalOptions) throws MappingErrorException {
-		try {
-			MappingLogger.getLogger().info(
-					"Starting user mapping to investigate error-profile");
-			userAlignerEntireCommand = userAlignerEntireCommand.replace(
-					"REFERENCE", reference);
-			userAlignerEntireCommand = userAlignerEntireCommand.replace(
-					"INPUT", input);
-			userAlignerEntireCommand = userAlignerEntireCommand.replace(
-					"OUTPUT", outputPrefix + ".sam");
-			userAlignerEntireCommand = userAlignerEntireCommand.replace(
-					"THREADS", "" + threads);
+			String additionalOptions) {
 
-			MappingLogger.getLogger().debug(
-					"USER COMMAND:" + userAlignerEntireCommand);
+		MappingLogger.getLogger().info(
+				"Starting user mapping to investigate error-profile");
+		userAlignerEntireCommand = userAlignerEntireCommand.replace(
+				"REFERENCE", reference);
+		userAlignerEntireCommand = userAlignerEntireCommand.replace("INPUT",
+				input);
+		userAlignerEntireCommand = userAlignerEntireCommand.replace("OUTPUT",
+				outputPrefix + ".sam");
+		userAlignerEntireCommand = userAlignerEntireCommand.replace("THREADS",
+				"" + threads);
 
-			String[] userAlignerCommands = userAlignerEntireCommand
-					.split("\\s");
+		MappingLogger.getLogger().debug(
+				"USER COMMAND:" + userAlignerEntireCommand);
 
-			List<String> userAlignerCommandsList = new LinkedList<String>();
-			for (int i = 0; i < userAlignerCommands.length; i++) {
-				userAlignerCommandsList.add(userAlignerCommands[i]);
-			}
+		String[] userAlignerCommands = userAlignerEntireCommand.split("\\s");
 
-			if (executeCommand(userAlignerCommandsList, StreamRedirect.ALL) != 0) {
-				MappingErrorException e = new MappingErrorException();
-				e.setMappingCommand(userAlignerCommandsList);
-				throw e;
-			}
-
-			MappingLogger
-					.getLogger()
-					.info("Convert SAM-file of user mapped reads to BAM-file, filter, sort, index, remove temp files");
-			MappingLogger.getLogger().debug(
-					"Convert SAM-file of usermapping mapped reads to BAM-file");
-			List<String> cleanUpCommandsList = new LinkedList<String>();
-			cleanUpCommandsList.add("samtools");
-			cleanUpCommandsList.add("view");
-			cleanUpCommandsList.add("-bS");
-			cleanUpCommandsList.add("-t");
-			cleanUpCommandsList.add(reference);
-			cleanUpCommandsList.add(outputPrefix + ".sam");
-			cleanUpCommandsList.add("-o");
-			cleanUpCommandsList.add(outputPrefix + ".bam");
-			executeCommand(cleanUpCommandsList, StreamRedirect.ALL);
-
-			MappingLogger.getLogger().debug(
-					"Filtering mapped reads with MAPQ lower than "
-							+ mappingQualityFilter);
-			cleanUpCommandsList.clear();
-			cleanUpCommandsList.add("samtools");
-			cleanUpCommandsList.add("view");
-			cleanUpCommandsList.add("-q");
-			cleanUpCommandsList.add("" + mappingQualityFilter);
-			cleanUpCommandsList.add("-b");
-			cleanUpCommandsList.add(outputPrefix + ".bam");
-			cleanUpCommandsList.add("-o");
-			cleanUpCommandsList.add(outputPrefix + ".unique.bam");
-			executeCommand(cleanUpCommandsList, StreamRedirect.ALL);
-
-			MappingLogger.getLogger().debug("Removing temporary files");
-			cleanUpCommandsList.clear();
-			cleanUpCommandsList.add("rm");
-			cleanUpCommandsList.add(outputPrefix + ".sam");
-			executeCommand(cleanUpCommandsList, StreamRedirect.ALL);
-			cleanUpCommandsList.clear();
-			cleanUpCommandsList.add("rm");
-			cleanUpCommandsList.add(outputPrefix + ".bam");
-			executeCommand(cleanUpCommandsList, StreamRedirect.ALL);
-			cleanUpCommandsList.clear();
-			cleanUpCommandsList.add("mv");
-			cleanUpCommandsList.add(outputPrefix + ".unique.bam");
-			cleanUpCommandsList.add(outputPrefix + ".bam");
-			executeCommand(cleanUpCommandsList, StreamRedirect.ALL);
-		} catch (IOException e) {
-			MappingLogger.getLogger().error(
-					"IO exception thrown in FirstMapping with "
-							+ "following error message:"
-							+ System.getProperty("line.separator")
-							+ e.getMessage());
-			e.printStackTrace();
-		} catch (InterruptedException e) {
-			MappingLogger.getLogger().error(
-					"Interrupted exception thrown in FirstMapping "
-							+ "with following error message:"
-							+ System.getProperty("line.separator")
-							+ e.getMessage());
-			e.printStackTrace();
+		List<String> userAlignerCommandsList = new LinkedList<String>();
+		for (int i = 0; i < userAlignerCommands.length; i++) {
+			userAlignerCommandsList.add(userAlignerCommands[i]);
 		}
+
+		executeCommand(userAlignerCommandsList, StreamRedirect.ALL);
+
+		MappingLogger
+				.getLogger()
+				.info("Convert SAM-file of user mapped reads to BAM-file, filter, sort, index, remove temp files");
+		MappingLogger.getLogger().debug(
+				"Convert SAM-file of usermapping mapped reads to BAM-file");
+		List<String> cleanUpCommandsList = new LinkedList<String>();
+		cleanUpCommandsList.add("samtools");
+		cleanUpCommandsList.add("view");
+		cleanUpCommandsList.add("-bS");
+		cleanUpCommandsList.add("-t");
+		cleanUpCommandsList.add(reference);
+		cleanUpCommandsList.add(outputPrefix + ".sam");
+		cleanUpCommandsList.add("-o");
+		cleanUpCommandsList.add(outputPrefix + ".bam");
+		executeCommand(cleanUpCommandsList, StreamRedirect.ALL);
+
+		MappingLogger.getLogger().debug(
+				"Filtering mapped reads with MAPQ lower than "
+						+ mappingQualityFilter);
+		cleanUpCommandsList.clear();
+		cleanUpCommandsList.add("samtools");
+		cleanUpCommandsList.add("view");
+		cleanUpCommandsList.add("-q");
+		cleanUpCommandsList.add("" + mappingQualityFilter);
+		cleanUpCommandsList.add("-b");
+		cleanUpCommandsList.add(outputPrefix + ".bam");
+		cleanUpCommandsList.add("-o");
+		cleanUpCommandsList.add(outputPrefix + ".unique.bam");
+		executeCommand(cleanUpCommandsList, StreamRedirect.ALL);
+
+		MappingLogger.getLogger().debug("Removing temporary files");
+		cleanUpCommandsList.clear();
+		cleanUpCommandsList.add("rm");
+		cleanUpCommandsList.add(outputPrefix + ".sam");
+		executeCommand(cleanUpCommandsList, StreamRedirect.ALL);
+		cleanUpCommandsList.clear();
+		cleanUpCommandsList.add("rm");
+		cleanUpCommandsList.add(outputPrefix + ".bam");
+		executeCommand(cleanUpCommandsList, StreamRedirect.ALL);
+		cleanUpCommandsList.clear();
+		cleanUpCommandsList.add("mv");
+		cleanUpCommandsList.add(outputPrefix + ".unique.bam");
+		cleanUpCommandsList.add(outputPrefix + ".bam");
+		executeCommand(cleanUpCommandsList, StreamRedirect.ALL);
+
 	}
 
 }

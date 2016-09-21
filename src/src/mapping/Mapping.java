@@ -34,12 +34,12 @@ public abstract class Mapping {
 	 *            filename of read file for input
 	 * @param outputPrefix
 	 *            prefix for filename of the mapping result
-	 * @throws MappingErrorException
+	 * @throws ExternalCallErrorException
 	 *             if mapper stops with an error, an exception is thrown.
 	 */
 	public abstract void executeMapping(int threads, String reference,
 			String input, String outputPrefix, int mappingQualityFilter,
-			String additionalOptions) throws MappingErrorException;
+			String additionalOptions);
 
 	/**
 	 * Renames a file in the file system.
@@ -50,17 +50,13 @@ public abstract class Mapping {
 	 *            new file name
 	 */
 	public void renameFile(String oldFileName, String newFileName) {
-		try {
-			List<String> renameCommandList = new LinkedList<String>();
-			renameCommandList.add("mv");
-			renameCommandList.add(oldFileName);
-			renameCommandList.add(newFileName);
-			executeCommand(renameCommandList, StreamRedirect.STDOUT);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+
+		List<String> renameCommandList = new LinkedList<String>();
+		renameCommandList.add("mv");
+		renameCommandList.add(oldFileName);
+		renameCommandList.add(newFileName);
+		executeCommand(renameCommandList, StreamRedirect.STDOUT);
+
 	}
 
 	/**
@@ -70,16 +66,12 @@ public abstract class Mapping {
 	 *            filename of the file which should be removed
 	 */
 	public void removeFile(String removeFileName) {
-		try {
-			List<String> removeCommandList = new LinkedList<String>();
-			removeCommandList.add("rm");
-			removeCommandList.add(removeFileName);
-			executeCommand(removeCommandList, StreamRedirect.STDOUT);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+
+		List<String> removeCommandList = new LinkedList<String>();
+		removeCommandList.add("rm");
+		removeCommandList.add(removeFileName);
+		executeCommand(removeCommandList, StreamRedirect.STDOUT);
+
 	}
 
 	/**
@@ -91,32 +83,27 @@ public abstract class Mapping {
 	 * 
 	 */
 	public void sortByCoordinateAndIndex(String bamFileName) {
-		try {
-			MappingLogger.getLogger().debug(
-					"Sorting BAM-file for faster access");
-			List<String> sortCommandsList = new LinkedList<String>();
-			sortCommandsList.add("samtools");
-			sortCommandsList.add("sort");
-			sortCommandsList.add(bamFileName);
-			sortCommandsList.add(bamFileName + "sort");
-			executeCommand(sortCommandsList, StreamRedirect.STDOUT);
-			sortCommandsList.clear();
-			sortCommandsList.add("mv");
-			sortCommandsList.add(bamFileName + "sort.bam");
-			sortCommandsList.add(bamFileName);
-			executeCommand(sortCommandsList, StreamRedirect.STDOUT);
-			MappingLogger.getLogger().debug(
-					"Indexing BAM-file for faster access");
-			sortCommandsList.clear();
-			sortCommandsList.add("samtools");
-			sortCommandsList.add("index");
-			sortCommandsList.add(bamFileName);
-			executeCommand(sortCommandsList, StreamRedirect.STDOUT);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+
+		MappingLogger.getLogger().debug("Sorting BAM-file for faster access");
+		List<String> sortCommandsList = new LinkedList<String>();
+		sortCommandsList.add("samtools");
+		sortCommandsList.add("sort");
+		sortCommandsList.add(bamFileName);
+		sortCommandsList.add("-o");
+		sortCommandsList.add(bamFileName + "sort.bam");
+		executeCommand(sortCommandsList, StreamRedirect.STDOUT);
+		sortCommandsList.clear();
+		sortCommandsList.add("mv");
+		sortCommandsList.add(bamFileName + "sort.bam");
+		sortCommandsList.add(bamFileName);
+		executeCommand(sortCommandsList, StreamRedirect.STDOUT);
+		MappingLogger.getLogger().debug("Indexing BAM-file for faster access");
+		sortCommandsList.clear();
+		sortCommandsList.add("samtools");
+		sortCommandsList.add("index");
+		sortCommandsList.add(bamFileName);
+		executeCommand(sortCommandsList, StreamRedirect.STDOUT);
+
 	}
 
 	/**
@@ -128,33 +115,28 @@ public abstract class Mapping {
 	 * 
 	 */
 	public void sortByNameAndIndex(String bamFileName) {
-		try {
-			MappingLogger.getLogger().debug(
-					"Sorting BAM-file for faster access");
-			List<String> sortCommandsList = new LinkedList<String>();
-			sortCommandsList.add("samtools");
-			sortCommandsList.add("sort");
-			sortCommandsList.add("-n");
-			sortCommandsList.add(bamFileName);
-			sortCommandsList.add(bamFileName + "sort");
-			executeCommand(sortCommandsList, StreamRedirect.STDOUT);
-			sortCommandsList.clear();
-			sortCommandsList.add("mv");
-			sortCommandsList.add(bamFileName + "sort.bam");
-			sortCommandsList.add(bamFileName);
-			executeCommand(sortCommandsList, StreamRedirect.STDOUT);
-			MappingLogger.getLogger().debug(
-					"Indexing BAM-file for faster access");
-			sortCommandsList.clear();
-			sortCommandsList.add("samtools");
-			sortCommandsList.add("index");
-			sortCommandsList.add(bamFileName);
-			executeCommand(sortCommandsList, StreamRedirect.STDOUT);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+
+		MappingLogger.getLogger().debug("Sorting BAM-file for faster access");
+		List<String> sortCommandsList = new LinkedList<String>();
+		sortCommandsList.add("samtools");
+		sortCommandsList.add("sort");
+		sortCommandsList.add("-n");
+		sortCommandsList.add(bamFileName);
+		sortCommandsList.add("-o");
+		sortCommandsList.add(bamFileName + "sort.bam");
+		executeCommand(sortCommandsList, StreamRedirect.STDOUT);
+		sortCommandsList.clear();
+		sortCommandsList.add("mv");
+		sortCommandsList.add(bamFileName + "sort.bam");
+		sortCommandsList.add(bamFileName);
+		executeCommand(sortCommandsList, StreamRedirect.STDOUT);
+		MappingLogger.getLogger().debug("Indexing BAM-file for faster access");
+		sortCommandsList.clear();
+		sortCommandsList.add("samtools");
+		sortCommandsList.add("index");
+		sortCommandsList.add(bamFileName);
+		executeCommand(sortCommandsList, StreamRedirect.STDOUT);
+
 	}
 
 	/**
@@ -165,13 +147,9 @@ public abstract class Mapping {
 	 * @param streamRedirect
 	 *            if a stream should be redirected from the program output to
 	 *            the console
-	 * @return returns the return-value of the respective program
-	 * @throws InterruptedException
-	 * @throws IOException
 	 */
-	protected int executeCommand(List<String> commands,
-			StreamRedirect streamRedirect) throws InterruptedException,
-			IOException {
+	protected void executeCommand(List<String> commands,
+			StreamRedirect streamRedirect) {
 		String commandString = "";
 		for (int i = 0; i < commands.size(); i++) {
 			commandString += commands.get(i) + " ";
@@ -186,8 +164,37 @@ public abstract class Mapping {
 				|| streamRedirect.equals(StreamRedirect.ALL)) {
 			mappingProcessBuilder.redirectError(Redirect.INHERIT);
 		}
-		mappingProcess = mappingProcessBuilder.start();
-		return mappingProcess.waitFor();
+		try {
+			mappingProcess = mappingProcessBuilder.start();
+			int exitStatus = mappingProcess.waitFor();
+			if (exitStatus != 0) {
+				throw (new ExternalCallErrorException(commandString));
+			}
+		} catch (InterruptedException e) {
+			MappingLogger
+					.getLogger()
+					.error("External program failed to return. "
+							+ "Please consider the last externally executed program "
+							+ "call for further error handling:");
+			MappingLogger.getLogger().error(commandString);
+			System.exit(1);
+		} catch (IOException e) {
+			MappingLogger
+					.getLogger()
+					.error("File not found/permission denied. "
+							+ "Please consider the last externally executed program "
+							+ "call for further error handling:");
+			MappingLogger.getLogger().error(commandString);
+			System.exit(1);
+		} catch (ExternalCallErrorException e) {
+			MappingLogger
+					.getLogger()
+					.error("External program had non-zero exit status. "
+							+ "Please consider the last externally executed program "
+							+ "call for further error handling:");
+			MappingLogger.getLogger().error(e.getMappingCommand());
+			System.exit(1);
+		}
 	}
 
 	protected void setTimeStart() {
