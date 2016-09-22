@@ -155,12 +155,10 @@ public class Help {
 
 	public void printSetupHelp() {
 		System.out
-				.println("NOT AVAILABLE IN THE CURRENT VERSION! PLEASE MANUALLY SET THE PATHS TO THE ALIGNERS!!");
-		System.out
 				.println("Usage: java -jar parasuite.jar setup --ALIGNER PATH_TO_ALIGNER"
 						+ System.getProperty("line.separator"));
 		System.out
-				.println("Currently supported options for aligners are: parasuite, bwa, bowtie2");
+				.println("Currently supported options for aligners are: --parasuite, --bwa, --bowtie2");
 	}
 
 	public void printSimulateHelp() {

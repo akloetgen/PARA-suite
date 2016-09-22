@@ -650,24 +650,28 @@ public class Main {
 					PARAsuiteProperties.setProperty(
 							PARAsuitePropertiesEnum.PARAsuite_LOCATION,
 							args[i + 1]);
+					i++;
 					break;
 				case "--bwa":
 					PARAsuiteProperties.setProperty(
 							PARAsuitePropertiesEnum.BWA_LOCATION, args[i + 1]);
+					i++;
 					break;
 				case "--bt2":
 					PARAsuiteProperties.setProperty(
 							PARAsuitePropertiesEnum.BT2_LOCATION, args[i + 1]);
+					i++;
 					break;
 				case "--bowtie":
 					PARAsuiteProperties.setProperty(
 							PARAsuitePropertiesEnum.BT_LOCATION, args[i + 1]);
+					i++;
 					break;
 				default:
 					MappingLogger
 							.getLogger()
 							.error("Aligner \""
-									+ args[0]
+									+ args[i]
 									+ "\" not found. Please consider the following "
 									+ "help-message for setting up the PARA-suite properlys.");
 					help.printSetupHelp();
@@ -822,7 +826,7 @@ public class Main {
 					MappingLogger
 							.getLogger()
 							.error("Input \""
-									+ args[0]
+									+ args[i]
 									+ "\" invalid. Please consider the following "
 									+ "help-message.");
 					help.printExtractHelp(mapqThreshold);
@@ -860,7 +864,7 @@ public class Main {
 
 				default:
 					MappingLogger.getLogger().error(
-							"Input \"" + args[0]
+							"Input \"" + args[i]
 									+ "\" invalid. -a for valid BAM input "
 									+ "and -o for writeable output.");
 					System.exit(1);
