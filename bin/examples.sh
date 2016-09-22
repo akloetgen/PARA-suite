@@ -55,7 +55,7 @@ if [ $? != 0 ]; then
 fi
 
 # combine genomic and transcriptomic mapping
-java -jar parasuite.jar comb ../examples/mapping/testout_simulation_mapped.PARAsuite-genomic.bam ../examples/mapping/testout_simulation_mapped.PARAsuite-transcript.bam ../examples/mapping/testout_simulation_mapped.PARAsuite.combined.bam
+java -jar parasuite.jar comb -g ../examples/mapping/testout_simulation_mapped.PARAsuite-genomic.bam -t ../examples/mapping/testout_simulation_mapped.PARAsuite-transcript.bam -o ../examples/mapping/testout_simulation_mapped.PARAsuite.combined.bam
 if [ $? != 0 ]; then
 	echo "Combining results failed. Please refer to the last error message and re-run this pipeline when the error is fixed."
 	exit 1
