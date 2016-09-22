@@ -87,11 +87,10 @@ public class Main {
 			mode = ProgramMode.FETCHSEQUENCESBEDFILE;
 			break;
 		default:
-			MappingLogger
-					.getLogger()
-					.error("Programmode \""
-							+ args[0]
-							+ "\" not found. Please consider the following help-message for a correct usage.");
+			MappingLogger.getLogger().error(
+					"Programmode \"" + args[0]
+							+ "\" not found. Please consider the following "
+							+ "help-message for a correct usage.");
 			help.printProgramModeHelp();
 			System.exit(1);
 		}
@@ -276,8 +275,9 @@ public class Main {
 						mapping = new BowtieMapping();
 						additionalOptions = btMismatches;
 					} else {
-						MappingLogger.getLogger().error(
-								"Mapping mode not set. Exit.");
+						MappingLogger
+								.getLogger()
+								.error("Mapping mode not set. Program integrity not given.");
 						System.exit(-1);
 					}
 					if (isFirstMapping) {
@@ -375,7 +375,7 @@ public class Main {
 
 							mapping.renameFile(genomicMappingFileNameNew,
 									genomicMappingFileName);
-							//mapping.removeFile(genomicMappingFileNameNew);
+							// mapping.removeFile(genomicMappingFileNameNew);
 						}
 						mapping.sortByCoordinateAndIndex(genomicMappingFileName);
 					}
@@ -386,7 +386,7 @@ public class Main {
 								mappingQualityFilterGenomic);
 						mapping.renameFile(genomicMappingFileNameNew,
 								genomicMappingFileName);
-						//mapping.removeFile(genomicMappingFileNameNew);
+						// mapping.removeFile(genomicMappingFileNameNew);
 					}
 
 					if (isTranscriptMapping) {
@@ -445,9 +445,31 @@ public class Main {
 				System.exit(1);
 			}
 			try {
-				genomicMappingFileName = args[1];
-				transcriptMappingFileName = args[2];
-				mappingFileName = args[3];
+
+				for (int i = 1; i < args.length; i++) {
+					switch (args[i]) {
+					case "-g":
+						i++;
+						genomicMappingFileName = args[i];
+						break;
+					case "-t":
+						i++;
+						transcriptMappingFileName = args[i];
+						break;
+					case "-o":
+						i++;
+						mappingFileName = args[i];
+						break;
+					default:
+						MappingLogger
+								.getLogger()
+								.error("Input " + args[i]
+										+ " invalid. Please consider the help:");
+						help.printCombineToolHelp();
+						System.exit(1);
+					}
+				}
+
 			} catch (ArrayIndexOutOfBoundsException e) {
 				MappingLogger
 						.getLogger()
@@ -484,9 +506,9 @@ public class Main {
 					onlyBoundClusters = true;
 				}
 			} catch (ArrayIndexOutOfBoundsException e) {
-				MappingLogger
-						.getLogger()
-						.error("Wrong number of input files. Please consider the following help:");
+				MappingLogger.getLogger().error(
+						"Wrong number of input files. "
+								+ "Please consider the following help:");
 				help.printBenchmarkToolHelp();
 				System.exit(1);
 			}
@@ -513,9 +535,9 @@ public class Main {
 				outStatistics = args[2];
 				clustersReferenceFile = args[3];
 			} catch (ArrayIndexOutOfBoundsException e) {
-				MappingLogger
-						.getLogger()
-						.error("Wrong number of input files. Please consider the following help:");
+				MappingLogger.getLogger().error(
+						"Wrong number of input files. "
+								+ "Please consider the following help:");
 				help.printBenchmarkToolHelp();
 				System.exit(1);
 			}
@@ -559,9 +581,9 @@ public class Main {
 					}
 				}
 			} catch (ArrayIndexOutOfBoundsException e) {
-				MappingLogger
-						.getLogger()
-						.error("Wrong number of input files. Please consider the following help:");
+				MappingLogger.getLogger().error(
+						"Wrong number of input files. "
+								+ "Please consider the following help:");
 				help.printErrorprofileToolHelp(isQualityCalc, showErrorPlot);
 				System.exit(1);
 			} catch (NumberFormatException e) {
@@ -642,7 +664,14 @@ public class Main {
 							PARAsuitePropertiesEnum.BT_LOCATION, args[i + 1]);
 					break;
 				default:
-					break;
+					MappingLogger
+							.getLogger()
+							.error("Aligner \""
+									+ args[0]
+									+ "\" not found. Please consider the following "
+									+ "help-message for setting up the PARA-suite properlys.");
+					help.printSetupHelp();
+					System.exit(1);
 				}
 			}
 
@@ -790,7 +819,14 @@ public class Main {
 					mapqThreshold = Integer.parseInt(args[i + 1]);
 					break;
 				default:
-					break;
+					MappingLogger
+							.getLogger()
+							.error("Input \""
+									+ args[0]
+									+ "\" invalid. Please consider the following "
+									+ "help-message.");
+					help.printExtractHelp(mapqThreshold);
+					System.exit(1);
 				}
 			}
 			if (inputBAMFile == null || outputFastqFile == null) {
@@ -821,10 +857,16 @@ public class Main {
 				case "-o":
 					outputReads = args[i + 1];
 					break;
+
+				default:
+					MappingLogger.getLogger().error(
+							"Input \"" + args[0]
+									+ "\" invalid. -a for valid BAM input "
+									+ "and -o for writeable output.");
+					System.exit(1);
 				}
 			}
 			if (inputBAMFile == null || outputReads == null) {
-				// help.printExtractHelp(mapqThreshold);
 				MappingLogger.getLogger().error("error message missing!!!");
 				System.exit(1);
 			}
