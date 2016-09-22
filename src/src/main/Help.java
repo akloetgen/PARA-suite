@@ -111,8 +111,11 @@ public class Help {
 	}
 
 	public void printCombineToolHelp() {
+		System.out.println("Usage: java -jar parasuite.jar comb");
+		System.out.println("\t-g FILE\talignment vs. genomic reference file");
 		System.out
-				.println("Usage: java -jar parasuite.jar comb GENOMIC_MAPPING_FILE TRANSCRIPTOMIC_MAPPING_FILE OUTPUT_FILE");
+				.println("\t-t FILE\talignment vs. transcriptomic reference file");
+		System.out.println("\t-o FILE\toutput file");
 	}
 
 	public void printBenchmarkToolHelp() {
